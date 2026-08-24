@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tehtaankatu Suutari — Atelier Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=2.0.1">
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-icon">✦</div>
+    <div><b>TEHTAANKATU</b><small>SUUTARI · ATELIER FLOW</small></div>
+  </div>
+  <nav>
+    <button class="active" data-page="home">⌂ <span>Tänään</span></button>
+    <button data-page="inbox">◉ <span>Viestit</span><em>3</em></button>
+    <button data-page="jobs">⚒ <span>Työt</span></button>
+    <button data-page="calendar">▦ <span>Kalenteri</span></button>
+    <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
+    <button data-page="customers">♙ <span>Asiakkaat</span></button>
+  </nav>
+  <div class="side-bottom"><button data-page="settings">⚙ <span>Asetukset</span></button></div>
+</aside>
+
+<main>
+<header class="topbar">
+  <div class="mobile-brand">TEHTAANKATU SUUTARI</div>
+  <div class="top-right">
+    <span>23.08.2026</span>
+    <button>🔔</button>
+    <div class="avatar">S</div>
+  </div>
+</header>
+
+<section id="home" class="page active">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Sunnuntai · 23.08.2026</div>
+      <h1>Verstaalla tänään</h1>
+      <p>Kiireellisimmät ja tärkeimmät työt alla.</p>
+    </div>
+    <button class="quick-add" onclick="openIntake()">＋ <span>UUSI VASTAANOTTO</span></button>
+  </div>
+  
+  <div class="stats">
+    <div class="stat red"><small>Toimenpiteitä tarvitaan</small><strong>3</strong><span>Tänään</span></div>
+    <div class="stat orange"><small>Toimitus tänään</small><strong>4</strong><span>2 tunnin sisällä</span></div>
+    <div class="stat blue"><small>Verstaalla</small><strong>12</strong><span>Työn alla</span></div>
+    <div class="stat teal"><small>Valmis</small><strong>3</strong><span>Asiakasta odotetaan</span></div>
+    <div class="stat purple"><small>Uusi viesti</small><strong>3</strong><span>WhatsApp</span></div>
+  </div>
+
+  <div class="section-title">
+    <h2>⚡ Tärkeät työt</h2>
+    <button onclick="showPage('jobs')">Kaikki työt →</button>
+  </div>
+  <div class="priority-grid" id="priority"></div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title"><h2>📦 Toimitus tänään</h2><span>4 työtä</span></div>
+      <div id="today"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>💬 WhatsApp</h2><button onclick="showPage('inbox')">Avaa →</button></div>
+      <div class="message-summary">
+        <div class="big-number">3</div>
+        <div>
+          <b>uutta asiakaskyselyä</b>
+          <p>2 asiakasta tuo tuotteen pian verstaalle.</p>
+        </div>
+      </div>
+      <button class="wide-btn" onclick="showPage('inbox')">Seuraa viestejä</button>
+    </div>
+  </div>
+</section>
+
+<section id="inbox" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">WhatsApp · Inbox</div>
+      <div class="wa-title-row">
+        <div><h1>WhatsApp</h1></div>
+        <button class="import-main" onclick="openImportModal()">📥 Tuo WhatsAppista</button>
+      </div>
+      <p>Hallitse koko prosessia asiakasviestistä työtilaukseen yhdeltä näytöltä.</p>
+    </div>
+    <button class="quick-add" onclick="openRequestForm()">＋ UUSI PYYNTÖ</button>
+  </div>
+  
+  <div class="pipeline">
+    <span class="on">Uusi <b>3</b></span>
+    <span>Vastattu <b>2</b></span>
+    <span>Asiakas tuo <b>2</b></span>
+    <span>Tuote saapui <b>1</b></span>
+    <span>Työn alla <b>5</b></span>
+  </div>
+  
+  <div class="whatsapp-shell">
+    <div class="chat-list">
+      <div class="chat-search">⌕ <input id="chatSearch" placeholder="Etsi asiakasta tai tuotetta..." oninput="renderWhatsappV5()"></div>
+      <div id="chatList"></div>
+    </div>
+    <div class="chat-window" id="chatWindow">
+      <div class="empty-chat">
+        <div class="wa-icon">◉</div>
+        <h2>Valitse asiakas</h2>
+        <p>Seuraa keskustelua, kyselyn tilaa ja työn tietoja samalta näytöltä.</p>
+      </div>
+    </div>
+    <aside class="chat-side" id="chatSide">
+      <div class="side-empty">Asiakkaan tiedot näkyvät tässä kun hänet on valittu.</div>
+    </aside>
+  </div>
+  <div class="kanban-mobile-note">Kanban-näkymä on saatavilla alla.</div>
+  <div class="kanban" id="kanban"></div>
+</section>
+
+<section id="jobs" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Ateljee</div>
+      <h1>Työt</h1>
+      <p>Katso missä ja missä vaiheessa kukin tuote on.</p>
+    </div>
+    <button class="quick-add" onclick="openIntake()">＋ UUSI VASTAANOTTO</button>
+  </div>
+  <div class="toolbar">
+    <input id="search" placeholder="⌕ Etsi asiakasta, työtä tai tuotetta..." oninput="renderJobs()">
+    <div class="chips">
+      <button class="active" onclick="setJobFilter('all', this)">Kaikki</button>
+      <button onclick="setJobFilter('active', this)">Työn alla</button>
+      <button onclick="setJobFilter('waiting', this)">Odottaa</button>
+      <button onclick="setJobFilter('ready', this)">Valmis</button>
+    </div>
+  </div>
+  <div class="table-card" id="jobsTable"></div>
+</section>
+
+<section id="calendar" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Aikataulutus</div>
+      <h1>Kalenteri</h1>
+      <p>Toimitusajat ja viivästykset.</p>
+    </div>
+  </div>
+  <div class="calendar card">
+    <div class="cal-head">
+      <button>‹</button>
+      <h2>Elokuu 2026</h2>
+      <button>›</button>
+    </div>
+    <div class="week">
+      <b>Ma</b><b>Ti</b><b>Ke</b><b>To</b><b>Pe</b><b>La</b><b>Su</b>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+  </div>
+</section>
+
+<section id="reports" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Raportointi</div>
+      <h1>Raportit & Vienti</h1>
+      <p>Tulot kanavittain, konversioasteet ja datan vienti.</p>
+    </div>
+    <div class="export-actions">
+      <button class="export-btn" onclick="exportCSV()">Lataa CSV</button>
+      <button class="export-btn primary" onclick="exportExcel()">Lataa Excel (.xls)</button>
+    </div>
+  </div>
+
+  <div class="filter-grid card">
+    <label>Alkupäivämäärä
+      <input type="date" id="exportFrom">
+    </label>
+    <label>Loppupäivämäärä
+      <input type="date" id="exportTo">
+    </label>
+    <label>Kanava
+      <select id="exportSource">
+        <option value="all">Kaikki kanavat</option>
+        <option value="store">Myymälä</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="email">Sähköposti</option>
+        <option value="post">Posti</option>
+      </select>
+    </label>
+    <label>Tila
+      <select id="exportStatus">
+        <option value="all">Kaikki tilat</option>
+        <option value="new">Uusi</option>
+        <option value="answered">Vastattu</option>
+        <option value="bring">Asiakas tuo</option>
+        <option value="arrived">Tuote saapui</option>
+        <option value="converted">Työn alla</option>
+        <option value="ready">Valmis</option>
+        <option value="delivered">Luovutettu</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span>Yhteensä kyselyitä</span>
+      <strong id="rTotal">0</strong>
+      <small>Kaikki saapuneet kyselyt</small>
+    </div>
+    <div class="stat-card">
+      <span>Työksi muutettu</span>
+      <strong id="rConverted">0</strong>
+      <small id="rConversion">0% konversio</small>
+    </div>
+    <div class="stat-card">
+      <span>Odottavat kyselyt</span>
+      <strong id="rPending">0</strong>
+      <small>Odottaa konversiota</small>
+    </div>
+    <div class="stat-card">
+      <span>Kokonaistuotto</span>
+      <strong id="rRevenue">€0</strong>
+      <small>Töiden kokonaisarvo</small>
+    </div>
+  </div>
+
+  <div class="report-grid">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Kyselyt kanavittain</h2>
+        <span>Kanavajakauma</span>
+      </div>
+      <div id="sourceStats"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Kyselyiden tilajakauma</h2>
+        <span>Vaiheet</span>
+      </div>
+      <div id="statusStats"></div>
+    </div>
+  </div>
+
+  <div class="panel data-panel">
+    <div class="panel-head">
+      <h2>Datan esikatselu</h2>
+      <span id="previewCount">0 tilausta</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Kysely ID</th>
+            <th>Kanava</th>
+            <th>Asiakas ID</th>
+            <th>Päivämäärä</th>
+            <th>Tuote</th>
+            <th>Korjaus</th>
+            <th>Tila</th>
+            <th>Hinta</th>
+            <th>Työtilaus ID</th>
+          </tr>
+        </thead>
+        <tbody id="exportTable"></tbody>
+      </table>
+    </div>
+    <div class="export-note">Yllä oleva taulukko esikatseli suodatettuja tietoja. Voit ladata kaikki tiedot CSV- tai Excel-painikkeilla.</div>
+  </div>
+</section>
+
+<section id="settings" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Asetukset</div>
+      <h1>Järjestelmäasetukset</h1>
+      <p>Määritä Supabase-tietokannan yhteysasetukset.</p>
+    </div>
+  </div>
+
+  <div class="card" style="max-width: 600px;">
+    <div class="card-title"><h2>Supabase-yhteys</h2></div>
+    <div class="form">
+      <div class="field full">
+        <label>Supabase URL</label>
+        <input type="text" id="dbUrl" placeholder="https://xxxxxx.supabase.co">
+      </div>
+      <div class="field full">
+        <label>Supabase Anon Key</label>
+        <input type="password" id="dbKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      </div>
+    </div>
+    <div style="margin-top: 20px; display: flex; gap: 10px;">
+      <button class="wide-btn" onclick="saveSettings()" style="background: var(--primary); color: white; border: 0;">Tallenna asetukset</button>
+      <button class="wide-btn" onclick="testConnection()" style="background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal);">Testaa yhteys</button>
+    </div>
+    <div id="connStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
+  </div>
+
+  <div class="card" style="max-width: 600px; margin-top: 20px;">
+    <div class="card-title"><h2>Google Gemini AI -yhteys</h2></div>
+    <div class="form">
+      <div class="field full">
+        <label>Gemini API Key</label>
+        <input type="password" id="geminiKey" placeholder="AIzaSy...">
+      </div>
+    </div>
+    <div style="margin-top: 20px;">
+      <button class="wide-btn" onclick="saveGeminiSettings()" style="background: var(--primary); color: white; border: 0;">Tallenna AI-asetukset</button>
+    </div>
+    <div id="aiStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
+  </div>
+  
+  <div class="card" style="max-width: 600px; margin-top: 20px;">
+    <div class="card-title"><h2>SQL-alustusohje</h2></div>
+    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+      Jotta tietokanta toimii oikein, sinun on suoritettava SQL-komennot Supabase-hallintapaneelin SQL Editorissa. Voit kopioida tarvittavan SQL-koodin painamalla alla olevaa painiketta.
+    </p>
+    <button class="wide-btn" onclick="copySQLSetup()" style="margin-top: 15px;">Kopioi SQL-alustus scripti</button>
+  </div>
+</section>
+
+<section id="customers" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Asiakkaat</div>
+      <h1>Asiakkaat</h1>
+      <p>Asiakashistoria ja tiedot.</p>
+    </div>
+  </div>
+  <div id="customersGrid" class="customer-grid"></div>
+</section>
+
+<section id="job" class="page">
+  <div class="hero">
+    <div>
+      <button class="back" onclick="showPage('jobs')">← Takaisin töihin</button>
+      <div class="eyebrow">TYÖN TIEDOT</div>
+      <h1 id="jobNo">#1052</h1>
+    </div>
+    <button class="secondary" onclick="openStatus()">Muuta tilaa</button>
+  </div>
+  <div id="jobDetail"></div>
+</section>
+</main>
+</div>
+
+<nav class="mobile-nav">
+  <button data-page="home" class="active">⌂<small>Tänään</small></button>
+  <button data-page="inbox">◉<small>Viestit</small></button>
+  <button data-page="jobs">⚒<small>Työt</small></button>
+  <button data-page="calendar">▦<small>Kalenteri</small></button>
+  <button data-page="customers">♙<small>Asiakkaat</small></button>
+</nav>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <button class="close" onclick="closeModal()">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="importModal" style="display:none">
+  <div class="import-modal">
+    <button class="modal-close" onclick="closeImportModal()">×</button>
+    <div class="eyebrow">MANUAALINEN TUONTI</div>
+    <h2>Lisää WhatsApp-keskustelu</h2>
+    <p class="import-intro">Lataa kuvakaappaus tai liitä viesti luodaksesi uuden asiakaskyselyn.</p>
+    <div class="import-tabs">
+      <button class="itab active" onclick="setImportTab('image',this)">📷 Kuvakaappaus</button>
+      <button class="itab" onclick="setImportTab('text',this)">📋 Liitä viesti</button>
+    </div>
+    
+    <div id="imageImport">
+      <label class="dropzone" id="dropzone">
+        <input type="file" accept="image/*" onchange="previewImportImage(event)">
+        <div id="dropContent">
+          <strong>📷 Valitse kuva tai raahaa se tähän</strong>
+          <span>WhatsApp-kuvakaappaus tai asiakkaan tuotteen kuva</span>
+        </div>
+        <img id="importPreview" style="display:none">
+      </label>
+      <div class="import-hint">Demossa kuva esikatsellaan. Voit muokata ja tallentaa lomakkeen klikkaamalla "Poimi tiedot".</div>
+      <button class="analyze-btn" onclick="showExtracted()">✨ Poimi tiedot</button>
+    </div>
+    
+    <div id="textImport" style="display:none">
+      <textarea id="pasteMessage" placeholder="Esimerkki: Hei! Voiko tämän laukun vetoketjun korjata? Paljonko maksaa?"></textarea>
+      <button class="analyze-btn" onclick="extractFromText()">✨ Poimi tiedot viestistä</button>
+    </div>
+    
+    <div class="extracted" id="extracted" style="display:none">
+      <div class="extract-head"><b>✓ Poimitut tiedot</b><span>Voit muokata ennen tallennusta</span></div>
+      <div class="extract-grid">
+        <label>Asiakas<input id="exName" placeholder="Asiakkaan nimi"></label>
+        <label>Tuote<input id="exProduct" placeholder="Esim. Käsilaukku"></label>
+        <label>Korjaus / ongelma<input id="exWork" placeholder="Esim. Vetoketjun korjaus"></label>
+        <label>Tila
+          <select id="exStatus">
+            <option value="new">🟠 Uusi kysely</option>
+            <option value="answered">💬 Vastattu</option>
+            <option value="bring">📅 Asiakas tuo</option>
+          </select>
+        </label>
+      </div>
+      <label class="full-label">Asiakkaan viesti<textarea id="exMessage"></textarea></label>
+      <div class="extract-actions">
+        <button class="cancel-small" onclick="closeImportModal()">Peruuta</button>
+        <button class="save-import" onclick="saveImportedRequest()">✓ Tallenna kyselynä</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js?v=2.0.6"></script>
+</body>
+</html>
