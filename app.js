@@ -131,6 +131,7 @@ function showPage(id){
   if(id==="calendar")renderCalendar();
   if(id==="customers")renderCustomers();
   if(id==="reports")renderReports();
+  if(id==="shelves")renderShelves();
   if(id==="settings") {
     document.getElementById("dbUrl").value = localStorage.getItem("suutari_db_url") || "";
     document.getElementById("dbKey").value = localStorage.getItem("suutari_db_key") || "";
@@ -788,4 +789,78 @@ Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mu
     console.error("Gemini analyze image error:", err);
     return null;
   }
+}
+
+let selectedShelf = null;
+
+function renderShelves() {
+  const rows = ["A", "B", "C"];
+  const numCells = 8;
+
+  rows.forEach(r => {
+    let cellsHtml = "";
+    for (let i = 1; i <= numCells; i++) {
+      const cellCode = `${r}${i}`;
+      
+      const shelfJobs = jobs.filter(j => j.status !== "done" && j.loc.trim().toUpperCase().startsWith(cellCode));
+      const jobCount = shelfJobs.length;
+      const hasLate = shelfJobs.some(j => j.status === "late");
+      
+      let classes = "shelf-cell";
+      if (selectedShelf === cellCode) classes += " selected";
+      if (hasLate) classes += " late";
+      else if (jobCount > 0) classes += " filled";
+      
+      cellsHtml += `
+        <div class="${classes}" onclick="selectShelf('${cellCode}')">
+          ${cellCode}
+          ${jobCount > 0 ? `<span class="badge">${jobCount}</span>` : ""}
+        </div>
+      `;
+    }
+    document.getElementById(`row${r}Cells`).innerHTML = cellsHtml;
+  });
+  
+  if (selectedShelf) {
+    showShelfDetails(selectedShelf);
+  } else {
+    document.getElementById("selectedShelfTitle").textContent = "Valitse hylly";
+    document.getElementById("shelfJobList").innerHTML = `
+      <div class="empty-row" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 40px 0;">
+        Klikkaa hyllysolua nähdäksesi sen sisällön.
+      </div>
+    `;
+  }
+}
+
+function selectShelf(shelfCode) {
+  selectedShelf = shelfCode;
+  renderShelves();
+}
+
+function showShelfDetails(shelfCode) {
+  document.getElementById("selectedShelfTitle").textContent = `Hylly ${shelfCode}`;
+  
+  const shelfJobs = jobs.filter(j => j.status !== "done" && j.loc.trim().toUpperCase().startsWith(shelfCode));
+  
+  if (shelfJobs.length === 0) {
+    document.getElementById("shelfJobList").innerHTML = `
+      <div class="empty-row" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 40px 0;">
+        Hylly on tyhjä.
+      </div>
+    `;
+    return;
+  }
+  
+  document.getElementById("shelfJobList").innerHTML = shelfJobs.map(j => `
+    <div class="shelf-job-row" onclick="openJob('${j.id}')">
+      <div>
+        <b style="font-size:14px;display:block;">${j.id} · ${j.name}</b>
+        <small style="font-size:11px;color:var(--text-muted)">${j.product} (${j.loc})</small>
+      </div>
+      <div>
+        <span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${statusLabel[j.status] || j.status}</span>
+      </div>
+    </div>
+  `).join("");
 }

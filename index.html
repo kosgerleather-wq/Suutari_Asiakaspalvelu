@@ -21,6 +21,7 @@
     <button data-page="inbox">◉ <span>Viestit</span><em>3</em></button>
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
+    <button data-page="shelves">◰ <span>Hyllykartta</span></button>
     <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
     <button data-page="customers">♙ <span>Asiakkaat</span></button>
   </nav>
@@ -160,6 +161,45 @@
       <b>Ma</b><b>Ti</b><b>Ke</b><b>To</b><b>Pe</b><b>La</b><b>Su</b>
     </div>
     <div id="calGrid" class="cal-grid"></div>
+  </div>
+</section>
+
+<section id="shelves" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Varasto & Sijainti</div>
+      <h1>Hyllykartta</h1>
+      <p>Katso ateljen hyllyjen tilanne ja paikanna tuotteet visuaalisesti.</p>
+    </div>
+  </div>
+
+  <div class="shelf-layout">
+    <div class="shelf-grid-card card">
+      <div class="shelf-row-group">
+        <h3>Hyllyrivistö A</h3>
+        <div class="shelf-cells" id="rowACells"></div>
+      </div>
+      <div class="shelf-row-group" style="margin-top: 25px;">
+        <h3>Hyllyrivistö B</h3>
+        <div class="shelf-cells" id="rowBCells"></div>
+      </div>
+      <div class="shelf-row-group" style="margin-top: 25px;">
+        <h3>Hyllyrivistö C</h3>
+        <div class="shelf-cells" id="rowCCells"></div>
+      </div>
+    </div>
+    
+    <div class="shelf-detail-card card">
+      <div class="panel-head" style="margin-bottom:15px">
+        <h2 id="selectedShelfTitle">Valitse hylly</h2>
+        <span style="font-size:12px;color:var(--text-muted)">Hyllyssä olevat aktiiviset työt</span>
+      </div>
+      <div class="shelf-job-list" id="shelfJobList">
+        <div class="empty-row" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 40px 0;">
+          Klikkaa hyllysolua nähdäksesi sen sisällön.
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -417,6 +457,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.0.6"></script>
+<script src="app.js?v=2.0.7"></script>
 </body>
 </html>
