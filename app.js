@@ -431,8 +431,45 @@ function openNotificationModal(jobId, status) {
 function renderCalendar(){let g=document.getElementById("calGrid"),html="";for(let i=0;i<6;i++)html+='<div class="day"></div>';for(let d=1;d<=31;d++){let count=jobs.filter(j=>j.date.startsWith(String(d).padStart(2,"0")+".")).length;html+=`<div class="day ${d===23?'today':''}"><strong>${d}</strong>${count?`<span class="dot ${count>1?'r':'o'}"></span>`:""}</div>`}g.innerHTML=html}
 
 function renderCustomers(){
-  let data=[["Anna Virtanen",4,235],["Matti Laine",3,180],["Sara Niemi",2,120],["Liisa Korhonen",5,410],["Jukka Virtanen",1,60],["Laura K.",1,45]];
-  document.getElementById("customersGrid").innerHTML=data.map(x=>`<div class="customer"><div class="person"><div class="person-icon">${x[0][0]}</div><div><h3>${x[0]}</h3><p>${x[1]} käyntiä</p></div></div><div class="money">${x[2]} €</div><p>Yhteensä</p></div>`).join("")}
+  const customerMap = {};
+  
+  jobs.forEach(j => {
+    const name = (j.name || "Uusi asiakas").trim();
+    const phone = (j.phone || "").trim();
+    const key = name.toLowerCase() + "|" + phone;
+    
+    if (!customerMap[key]) {
+      customerMap[key] = {
+        name: name,
+        phone: phone,
+        visits: 0,
+        totalSpent: 0
+      };
+    }
+    
+    customerMap[key].visits += 1;
+    customerMap[key].totalSpent += Number(j.price) || 0;
+  });
+  
+  const customerList = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
+  
+  document.getElementById("customersGrid").innerHTML = customerList.map(c => {
+    const initial = c.name ? c.name.charAt(0).toUpperCase() : "?";
+    return `
+      <div class="customer">
+        <div class="person">
+          <div class="person-icon" style="display:flex;align-items:center;justify-content:center;font-weight:bold;background:var(--primary-light);color:var(--primary);">${initial}</div>
+          <div>
+            <h3>${c.name}</h3>
+            <p>${c.visits} käyntiä ${c.phone ? `· ${c.phone}` : ""}</p>
+          </div>
+        </div>
+        <div class="money">${c.totalSpent} €</div>
+        <p>Yhteensä</p>
+      </div>
+    `;
+  }).join("");
+}
 
 function closeModal(){document.getElementById("modal").classList.add("hidden")}
 document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
