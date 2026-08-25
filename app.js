@@ -813,7 +813,16 @@ async function parseMessageWithAI(text) {
   if (!apiKey) return null;
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
-  const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
+  const targets = [
+    { ver: "v1", model: "gemini-1.5-flash" },
+    { ver: "v1beta", model: "gemini-1.5-flash" },
+    { ver: "v1", model: "gemini-1.5-flash-latest" },
+    { ver: "v1beta", model: "gemini-1.5-flash-latest" },
+    { ver: "v1", model: "gemini-1.5-pro" },
+    { ver: "v1beta", model: "gemini-1.5-pro" },
+    { ver: "v1", model: "gemini-pro" },
+    { ver: "v1beta", model: "gemini-pro" }
+  ];
   
   const prompt = `Lue seuraava WhatsApp-keskustelu tai viesti ja poimi siitä tiedot JSON-muodossa. 
 Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
@@ -835,9 +844,9 @@ Viesti:
 "${text}"`;
 
   let lastErrorMsg = "Tuntematon virhe";
-  for (const model of models) {
+  for (const t of targets) {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -855,11 +864,11 @@ Viesti:
         }
         return JSON.parse(cleanText);
       } else if (data.error) {
-        lastErrorMsg = data.error.message;
+        lastErrorMsg = `${t.model} (${t.ver}): ${data.error.message}`;
       }
     } catch (err) {
-      console.warn(`Model ${model} failed on parse message, trying next...`, err);
-      lastErrorMsg = err.message;
+      console.warn(`Model ${t.model} on ${t.ver} failed, trying next...`, err);
+      lastErrorMsg = `${t.model} (${t.ver}): ${err.message}`;
     }
   }
   
@@ -872,7 +881,16 @@ async function analyzeImageWithAI(base64Data, mimeType) {
   if (!apiKey) return null;
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
-  const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
+  const targets = [
+    { ver: "v1", model: "gemini-1.5-flash" },
+    { ver: "v1beta", model: "gemini-1.5-flash" },
+    { ver: "v1", model: "gemini-1.5-flash-latest" },
+    { ver: "v1beta", model: "gemini-1.5-flash-latest" },
+    { ver: "v1", model: "gemini-1.5-pro" },
+    { ver: "v1beta", model: "gemini-1.5-pro" },
+    { ver: "v1", model: "gemini-pro" },
+    { ver: "v1beta", model: "gemini-pro" }
+  ];
   
   const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva vauriosta/tuotteesta ja poimi tiedot JSON-muodossa. 
 Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
@@ -893,9 +911,9 @@ JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mukaan.`;
 
   let lastErrorMsg = "Tuntematon virhe";
-  for (const model of models) {
+  for (const t of targets) {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -923,11 +941,11 @@ Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mu
         }
         return JSON.parse(cleanText);
       } else if (data.error) {
-        lastErrorMsg = data.error.message;
+        lastErrorMsg = `${t.model} (${t.ver}): ${data.error.message}`;
       }
     } catch (err) {
-      console.warn(`Model ${model} failed on image analysis, trying next...`, err);
-      lastErrorMsg = err.message;
+      console.warn(`Model ${t.model} on ${t.ver} failed on image analysis, trying next...`, err);
+      lastErrorMsg = `${t.model} (${t.ver}): ${err.message}`;
     }
   }
   
@@ -1061,12 +1079,21 @@ Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (In
 
 Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
 
-  const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
+  const targets = [
+    { ver: "v1", model: "gemini-1.5-flash" },
+    { ver: "v1beta", model: "gemini-1.5-flash" },
+    { ver: "v1", model: "gemini-1.5-flash-latest" },
+    { ver: "v1beta", model: "gemini-1.5-flash-latest" },
+    { ver: "v1", model: "gemini-1.5-pro" },
+    { ver: "v1beta", model: "gemini-1.5-pro" },
+    { ver: "v1", model: "gemini-pro" },
+    { ver: "v1beta", model: "gemini-pro" }
+  ];
   let success = false;
   
-  for (const model of models) {
+  for (const t of targets) {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1082,7 +1109,7 @@ Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), os
         break;
       }
     } catch (err) {
-      console.warn(`Social generator model ${model} failed, trying next...`, err);
+      console.warn(`Social generator model ${t.model} on ${t.ver} failed, trying next...`, err);
     }
   }
   
@@ -1292,33 +1319,40 @@ async function testAISettings() {
     return;
   }
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${key}`);
-    const data = await res.json();
-    
-    if (!res.ok) {
-      const errMsg = data.error ? data.error.message : "Tuntematon virhe";
-      statusEl.textContent = `Yhteys epäonnistui: ${errMsg}`;
-      statusEl.style.color = "var(--red)";
-      alert(`Google Gemini API Yhteysvirhe:\n\n${errMsg}`);
-      return;
+  // Try v1 first, fallback to v1beta if needed
+  const versions = ["v1", "v1beta"];
+  let lastError = "Tuntematon virhe";
+  
+  for (const ver of versions) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/${ver}/models?key=${key}`);
+      const data = await res.json();
+      
+      if (res.ok) {
+        if (data.models && data.models.length > 0) {
+          const modelNames = data.models.map(m => m.name.replace("models/", "")).join(", ");
+          statusEl.textContent = `Yhteys onnistui (${ver})! Mallit: ${modelNames}`;
+          statusEl.style.color = "var(--teal)";
+          alert(`AI-yhteys toimii loistavasti (${ver})!\n\nSaatavilla olevat mallit avaimellesi:\n\n${modelNames}`);
+          return;
+        } else {
+          statusEl.textContent = `Yhteys onnistui (${ver}), mutta yhtään mallia ei ole saatavilla tälle avaimelle.`;
+          statusEl.style.color = "orange";
+          alert(`Google API (${ver}) vastasi, mutta yhtään mallia ei palautettu. API-avaimessa saattaa olla rajoituksia.`);
+          return;
+        }
+      } else {
+        lastError = data.error ? data.error.message : "Virhe";
+      }
+    } catch (err) {
+      console.warn(`ListModels on ${ver} failed:`, err);
+      lastError = err.message;
     }
-
-    if (data.models && data.models.length > 0) {
-      const modelNames = data.models.map(m => m.name.replace("models/", "")).join(", ");
-      statusEl.textContent = "Yhteys onnistui! Saatavilla olevat tekoälymallit: " + modelNames;
-      statusEl.style.color = "var(--teal)";
-      alert("AI-yhteys toimii loistavasti!\n\nSaatavilla olevat mallit avaimellesi:\n" + modelNames);
-    } else {
-      statusEl.textContent = "Yhteys onnistui, mutta yhtään mallia ei ole saatavilla tälle avaimelle.";
-      statusEl.style.color = "orange";
-      alert("Google API vastasi, mutta yhtään mallia ei palautettu. API-avaimessa saattaa olla rajoituksia.");
-    }
-  } catch (err) {
-    statusEl.textContent = "Verkkovirhe testauksessa: " + err.message;
-    statusEl.style.color = "var(--red)";
-    alert("Yhteyden testauksessa tapahtui verkkovirhe: " + err.message);
   }
+
+  statusEl.textContent = `Yhteys epäonnistui: ${lastError}`;
+  statusEl.style.color = "var(--red)";
+  alert(`Google Gemini API Yhteysvirhe:\n\n${lastError}`);
 }
 
 
