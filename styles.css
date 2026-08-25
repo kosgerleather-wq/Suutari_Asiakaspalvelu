@@ -2435,7 +2435,7 @@ main {
   .mobile-nav {
     display: grid;
     position: fixed;
-    z-index: 15;
+    z-index: 999;
     bottom: 0;
     left: 0;
     right: 0;
@@ -2599,4 +2599,22 @@ main {
   .shelf-cells {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+/* Force hide Netlify injected badges/overlays blocking buttons */
+#netlify-identity-widget,
+.netlify-identity-widget,
+#netlify-badge,
+.netlify-badge,
+iframe[src*="netlify"],
+div[class*="netlify"],
+[data-netlify-announce],
+img[src*="netlify"],
+[alt*="Netlify"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
 }
