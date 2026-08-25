@@ -1269,5 +1269,6 @@ function convertRequestToJob() {
   closeModal();
   openIntake(prefill);
 }
+}
 
 
