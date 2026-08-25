@@ -22,6 +22,7 @@
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
     <button data-page="shelves">◰ <span>Hyllykartta</span></button>
+    <button data-page="social">📢 <span>Sosiaalinen Media</span></button>
     <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
     <button data-page="customers">♙ <span>Asiakkaat</span></button>
   </nav>
@@ -198,6 +199,90 @@
         <div class="empty-row" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 40px 0;">
           Klikkaa hyllysolua nähdäksesi sen sisällön.
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="social" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Markkinointi & SEO</div>
+      <h1>Sosiaalinen Media & Google Maps</h1>
+      <p>Luo Ennen/Jälkeen -kuvia, kirjoita AI-julkaisuja ja hallitse viikoittaista julkaisusuunnitelmaasi.</p>
+    </div>
+  </div>
+
+  <div class="social-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <!-- LEFT PANEL: Weekly Plan & AI Drafts -->
+    <div class="card" style="padding:24px;">
+      <h3 style="margin:0 0 15px;color:var(--primary);font-family:var(--font-heading)">📅 Viikkosuunnitelma (Tavoite: 3 postausta)</h3>
+      <div class="weekly-tracker" style="display:flex;justify-content:space-between;background:var(--bg);padding:15px;border-radius:10px;margin-bottom:20px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="postMon" onchange="updateSocialProgress()"> Maanantai (Vinkki)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="postWed" onchange="updateSocialProgress()"> Keskiviikko (Työn alla)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="postFri" onchange="updateSocialProgress()"> Perjantai (Ennen/Jälkeen)
+        </label>
+      </div>
+      <div style="background:var(--primary-light);border-radius:8px;padding:12px;margin-bottom:25px;">
+        <b style="font-size:12px;color:var(--primary);display:block;margin-bottom:4px;">💡 Tämän päivän suositus:</b>
+        <p style="font-size:12px;margin:0;color:var(--text-muted);" id="socialIdeaText">Lataa "Ennen & Jälkeen" -kuva viikon parhaasta työstäsi ja anna AI:n luoda Fince julkaisuteksti.</p>
+      </div>
+
+      <h3 style="margin:0 0 15px;color:var(--primary);font-family:var(--font-heading)">✍️ AI Sisällöntuottaja</h3>
+      <div class="form" style="display:grid;gap:12px;">
+        <div class="field full">
+          <label>Valitse työ julkaisua varten</label>
+          <select id="socialJobSelect" onchange="loadJobForSocial()" style="padding:10px;border-radius:8px;border:1px solid var(--border-color);font-size:13px;background:white;width:100%;box-sizing:border-box;"></select>
+        </div>
+        <button class="save" onclick="generateAISocialPost()" id="btnGenerateSocial" style="border:0;border-radius:9px;padding:12px;font-weight:700;cursor:pointer;width:100%;">🪄 Luo Fince julkaisuteksti (Gemini AI)</button>
+        <div class="card" style="background:var(--bg);border:1px solid var(--border-color);padding:15px;margin-top:10px;display:none;" id="aiCaptionCard">
+          <b style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:8px;">AI-JULKAISUTEKSTI</b>
+          <p id="aiCaptionText" style="font-size:13px;line-height:1.5;margin:0;white-space:pre-wrap;"></p>
+          <button class="wide-btn" onclick="copyCaption()" style="margin-top:15px;">📋 Kopioi teksti</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: Before / After Editor -->
+    <div class="card" style="padding:24px;">
+      <h3 style="margin:0 0 15px;color:var(--primary);font-family:var(--font-heading)">📸 Ennen & Jälkeen -kuvaeditori</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 20px;">Luo upea yhdistelmäkuva sosiaaliseen mediaan tai Google-julkaisuihin.</p>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:20px;">
+        <div style="text-align:center;">
+          <b style="font-size:11px;display:block;margin-bottom:6px;color:var(--text-muted)">ENNEN (Öncesi)</b>
+          <img id="beforeImgPreview" src="bag.png" style="width:100%;height:130px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color)">
+        </div>
+        <div style="text-align:center;">
+          <b style="font-size:11px;display:block;margin-bottom:6px;color:var(--text-muted)">JÄLKEEN (Sonrası)</b>
+          <label class="dropzone" style="border:2px dashed var(--border-color);border-radius:8px;height:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg);overflow:hidden;box-sizing:border-box;">
+            <input type="file" id="afterFile" accept="image/*" style="display:none" onchange="loadAfterImage(event)">
+            <img id="afterImgPreview" style="display:none;width:100%;height:100%;object-fit:cover;">
+            <div id="afterDropText" style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px;">
+              📷 Lataa jälkeen-kuva
+            </div>
+          </label>
+        </div>
+      </div>
+      
+      <div class="form" style="display:grid;gap:12px;margin-bottom:15px;">
+        <div class="field full">
+          <label>Brändin vesileiman teksti</label>
+          <input type="text" id="watermarkText" value="Tehtaankatu Suutari" style="padding:10px;border-radius:8px;border:1px solid var(--border-color);width:100%;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <button class="save" onclick="combineImages()" style="width:100%;border:0;border-radius:9px;padding:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">🎨 Yhdistä ja esikatsele</button>
+      
+      <!-- Canvas Preview & Download -->
+      <div style="text-align:center;display:none;" id="combinedCanvasCard">
+        <canvas id="combinedCanvas" style="max-width:100%;border-radius:8px;border:1px solid var(--border-color);box-shadow:0 4px 15px rgba(0,0,0,0.1);margin-bottom:15px;"></canvas>
+        <button class="save" onclick="downloadCombinedImage()" style="background:var(--teal);border:0;border-radius:9px;padding:12px;font-weight:700;cursor:pointer;width:100%">📥 Lataa valmis kuva tietokoneelle</button>
       </div>
     </div>
   </div>
@@ -457,6 +542,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.0.7"></script>
+<script src="app.js?v=2.0.8"></script>
 </body>
 </html>

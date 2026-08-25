@@ -48,6 +48,17 @@ async function dbUpdateJobStatus(id, status) {
   }
 }
 
+async function dbUpdateJobAfterImage(id, img_after) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("jobs").update({ img_after }).eq("id", id);
+      if(error) console.error("Supabase update job after_image error:", error);
+    } catch(err) {
+      console.error(err);
+    }
+  }
+}
+
 async function dbUpsertRequest(r) {
   if (supabaseClient) {
     try {
@@ -132,6 +143,7 @@ function showPage(id){
   if(id==="customers")renderCustomers();
   if(id==="reports")renderReports();
   if(id==="shelves")renderShelves();
+  if(id==="social")renderSocial();
   if(id==="settings") {
     document.getElementById("dbUrl").value = localStorage.getItem("suutari_db_url") || "";
     document.getElementById("dbKey").value = localStorage.getItem("suutari_db_key") || "";
@@ -287,6 +299,25 @@ function renderJobs(){
   document.getElementById("jobsTable").innerHTML=`<div class="table-head"><div>Nro</div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`+a.map(j=>`<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${statusLabel[j.status]}</span></div></div>`).join("");
 }
 
+function uploadDetailAfterImage(e, id) {
+  const f = e.target.files?.[0];
+  if(!f) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const base64 = evt.target.result;
+    const j = jobs.find(x => x.id === id);
+    if(j) {
+      j.img_after = base64;
+      saveState();
+      document.getElementById("detailAfterPreview").src = base64;
+      document.getElementById("detailAfterPreview").style.opacity = 1;
+      dbUpdateJobAfterImage(id, base64);
+    }
+  };
+  reader.readAsDataURL(f);
+}
+
 function openJob(id){
   const j=jobs.find(x=>x.id===id);
   document.getElementById("jobNo").textContent=j.id;
@@ -297,7 +328,22 @@ function openJob(id){
 
   document.getElementById("jobDetail").innerHTML=`<div class="detail-grid">
     <div class="detail">
-      <div style="display:flex;gap:16px"><img src="${j.img}"><div><h2 style="margin:0 0 5px;font-size:18px">${j.name}</h2><p style="font-size:12px;color:#7d8990">${j.product}</p><span class="pill teal">${j.loc}</span></div></div>
+      <div style="display:flex;gap:16px;align-items:center;margin-bottom:15px;">
+        <div style="position:relative;">
+          <img src="${j.img}" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;">
+          <span style="position:absolute;bottom:4px;left:4px;background:rgba(15,45,74,0.85);color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">ENNEN</span>
+        </div>
+        <div style="position:relative;cursor:pointer;" onclick="document.getElementById('detailAfterFile').click()">
+          <img src="${j.img_after || 'bag.png'}" id="detailAfterPreview" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;opacity:${j.img_after ? 1 : 0.4};">
+          <span style="position:absolute;bottom:4px;left:4px;background:rgba(16,185,129,0.85);color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">JÄLKEEN</span>
+          <input type="file" id="detailAfterFile" accept="image/*" style="display:none" onchange="uploadDetailAfterImage(event, '${j.id}')">
+        </div>
+      </div>
+      <div>
+        <h2 style="margin:0 0 5px;font-size:18px">${j.name}</h2>
+        <p style="font-size:12px;color:#7d8990;margin:0 0 5px;">${j.product}</p>
+        <span class="pill teal">${j.loc}</span>
+      </div>
       <hr style="border:0;border-top:1px solid #e6edef;margin:18px 0">
       <b style="font-size:11px">Työ</b><p style="font-size:13px">${j.work} · <strong>${j.price} €</strong></p>
       <b style="font-size:11px">Toimitus</b><p style="font-size:13px">${j.date}</p>
@@ -694,7 +740,7 @@ async function testConnection() {
 }
 
 function copySQLSetup() {
-  const sql = `-- Create requests table\\nCREATE TABLE IF NOT EXISTS requests (\\n    id BIGINT PRIMARY KEY,\\n    name TEXT,\\n    product TEXT,\\n    work TEXT,\\n    status TEXT,\\n    img TEXT,\\n    msg TEXT,\\n    reply TEXT,\\n    source TEXT,\\n    request_id TEXT UNIQUE,\\n    customer_id TEXT,\\n    created_at TEXT,\\n    price TEXT,\\n    job_id TEXT\\n);\\n\\n-- Create jobs table\\nCREATE TABLE IF NOT EXISTS jobs (\\n    id TEXT PRIMARY KEY,\\n    name TEXT,\\n    phone TEXT,\\n    product TEXT,\\n    work TEXT,\\n    price NUMERIC,\\n    date TEXT,\\n    status TEXT,\\n    loc TEXT,\\n    img TEXT,\\n    note TEXT,\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\\n);\\n\\n-- Enable Row Level Security (RLS)\\nALTER TABLE requests ENABLE ROW LEVEL SECURITY;\\nALTER TABLE jobs ENABLE ROW LEVEL SECURITY;\\n\\n-- Create policies for public access\\nCREATE POLICY "Allow public read" ON requests FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON requests FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON requests FOR UPDATE USING (true);\\n\\nCREATE POLICY "Allow public read" ON jobs FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON jobs FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON jobs FOR UPDATE USING (true);`;
+  const sql = `-- Create requests table\\nCREATE TABLE IF NOT EXISTS requests (\\n    id BIGINT PRIMARY KEY,\\n    name TEXT,\\n    product TEXT,\\n    work TEXT,\\n    status TEXT,\\n    img TEXT,\\n    msg TEXT,\\n    reply TEXT,\\n    source TEXT,\\n    request_id TEXT UNIQUE,\\n    customer_id TEXT,\\n    created_at TEXT,\\n    price TEXT,\\n    job_id TEXT\\n);\\n\\n-- Create jobs table\\nCREATE TABLE IF NOT EXISTS jobs (\\n    id TEXT PRIMARY KEY,\\n    name TEXT,\\n    phone TEXT,\\n    product TEXT,\\n    work TEXT,\\n    price NUMERIC,\\n    date TEXT,\\n    status TEXT,\\n    loc TEXT,\\n    img TEXT,\\n    img_after TEXT,\\n    note TEXT,\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\\n);\\n\\n-- Enable Row Level Security (RLS)\\nALTER TABLE requests ENABLE ROW LEVEL SECURITY;\\nALTER TABLE jobs ENABLE ROW LEVEL SECURITY;\\n\\n-- Create policies for public access\\nCREATE POLICY "Allow public read" ON requests FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON requests FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON requests FOR UPDATE USING (true);\\n\\nCREATE POLICY "Allow public read" ON jobs FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON jobs FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON jobs FOR UPDATE USING (true);`;
   navigator.clipboard.writeText(sql.replace(/\\n/g, '\n')).then(() => {
     alert("SQL-alustuskoodi kopioitu leikepöydälle!");
   });
@@ -789,6 +835,245 @@ Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mu
     console.error("Gemini analyze image error:", err);
     return null;
   }
+}
+
+let afterImageBase64 = null;
+
+function loadAfterImage(e) {
+  const f = e.target.files?.[0];
+  if(!f) return;
+  
+  const preview = document.getElementById("afterImgPreview");
+  const dropText = document.getElementById("afterDropText");
+  
+  preview.src = URL.createObjectURL(f);
+  preview.style.display = "block";
+  dropText.style.display = "none";
+  
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    afterImageBase64 = evt.target.result;
+    
+    const select = document.getElementById("socialJobSelect");
+    const jobId = select.value;
+    if (jobId) {
+      const j = jobs.find(x => x.id === jobId);
+      if (j) {
+        j.img_after = afterImageBase64;
+        saveState();
+        dbUpdateJobAfterImage(jobId, afterImageBase64);
+      }
+    }
+  };
+  reader.readAsDataURL(f);
+}
+
+function renderSocial() {
+  document.getElementById("postMon").checked = localStorage.getItem("social_post_mon") === "true";
+  document.getElementById("postWed").checked = localStorage.getItem("social_post_wed") === "true";
+  document.getElementById("postFri").checked = localStorage.getItem("social_post_fri") === "true";
+  updateSocialProgress();
+
+  const relevantJobs = jobs.filter(j => j.status === "ready" || j.status === "done" || j.status === "active");
+  const select = document.getElementById("socialJobSelect");
+  
+  if (relevantJobs.length === 0) {
+    select.innerHTML = `<option value="">Ei aktiivisia tai valmiita töitä</option>`;
+    return;
+  }
+  
+  select.innerHTML = relevantJobs.map(j => `<option value="${j.id}">${j.id} - ${j.name} (${j.product})</option>`).join("");
+  loadJobForSocial();
+}
+
+function updateSocialProgress() {
+  localStorage.setItem("social_post_mon", document.getElementById("postMon").checked);
+  localStorage.setItem("social_post_wed", document.getElementById("postWed").checked);
+  localStorage.setItem("social_post_fri", document.getElementById("postFri").checked);
+  
+  const count = [document.getElementById("postMon").checked, document.getElementById("postWed").checked, document.getElementById("postFri").checked].filter(Boolean).length;
+  
+  const ideaText = document.getElementById("socialIdeaText");
+  if (count === 0) {
+    ideaText.textContent = "Maanantai suositus: Jaa Google Mapsissa uusi hyödyllinen vinkki (esim. nahanhoito syksyllä).";
+  } else if (count === 1) {
+    ideaText.textContent = "Keskiviikko suositus: Jaa lyhyt kuva tai tarina meneillään olevasta työstänne (🔧 Työn alla).";
+  } else if (count === 2) {
+    ideaText.textContent = "Perjantai suositus: Luo upea \"Ennen & Jälkeen\" -kuva ja julkaise se viikonlopuksi!";
+  } else {
+    ideaText.textContent = "✨ Upeaa työtä! Viikon julkaisutavoite (3 postausta) on saavutettu!";
+  }
+}
+
+function loadJobForSocial() {
+  const select = document.getElementById("socialJobSelect");
+  const jobId = select.value;
+  if (!jobId) return;
+  
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return;
+  
+  document.getElementById("beforeImgPreview").src = j.img || "bag.png";
+  
+  const afterPreview = document.getElementById("afterImgPreview");
+  const afterDropText = document.getElementById("afterDropText");
+  
+  if (j.img_after) {
+    afterImageBase64 = j.img_after;
+    afterPreview.src = j.img_after;
+    afterPreview.style.display = "block";
+    afterDropText.style.display = "none";
+  } else {
+    afterImageBase64 = null;
+    afterPreview.src = "";
+    afterPreview.style.display = "none";
+    afterDropText.style.display = "block";
+  }
+  
+  document.getElementById("combinedCanvasCard").style.display = "none";
+  document.getElementById("aiCaptionCard").style.display = "none";
+}
+
+function copyCaption() {
+  const text = document.getElementById("aiCaptionText").textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert("Julkaisuteksti kopioitu leikepöydälle!");
+  });
+}
+
+async function generateAISocialPost() {
+  const select = document.getElementById("socialJobSelect");
+  const jobId = select.value;
+  if (!jobId) {
+    alert("Valitse ensin työ listasta.");
+    return;
+  }
+  
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return;
+  
+  const apiKey = localStorage.getItem("suutari_gemini_key");
+  if (!apiKey) {
+    const fallbackText = `🔨 Ennen & Jälkeen - Korjaus valmis!\n\nTeimme upean korjauksen tähän tuotteeseen: ${j.product} (${j.work}). Kengät tai laukku ovat nyt valmiina uusiin seikkailuihin! \n\nTervetuloa huoltamaan suosikkituotteesi ateljeehenne.\n\n📍 Tehtaankatu 18, Helsinki\n#suutari #helsinki #kenkähuolto`;
+    document.getElementById("aiCaptionText").textContent = fallbackText;
+    document.getElementById("aiCaptionCard").style.display = "block";
+    return;
+  }
+  
+  const btn = document.getElementById("btnGenerateSocial");
+  const oldText = btn.textContent;
+  btn.textContent = "AI kirjoittaa... 🪄";
+  btn.disabled = true;
+  
+  const prompt = `Olet ammattitaitoinen suutari ja sisällöntuottaja Tehtaankatu Suutari -liikkeelle Helsingissä.
+Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (Instagram, Facebook tai Google Maps) Fince seuraavasta valmiista työstä:
+- Tuote: ${j.product}
+- Tehty korjaus: ${j.work}
+- Hinta: ${j.price} €
+
+Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
+    const data = await res.json();
+    const caption = data.candidates[0].content.parts[0].text.trim();
+    document.getElementById("aiCaptionText").textContent = caption;
+    document.getElementById("aiCaptionCard").style.display = "block";
+  } catch (err) {
+    console.error("Gemini social media generator error:", err);
+    alert("AI-tekstin luominen epäonnistui. Käytetään valmista pohjaa.");
+    const fallbackText = `🔨 Ennen & Jälkeen - Korjaus valmis!\n\nTeimme upean korjauksen tähän tuotteeseen: ${j.product} (${j.work}). Kengät tai laukku ovat nyt valmiina uusiin seikkailuihin! \n\nTervetuloa huoltamaan suosikkituotteesi ateljeehenne.\n\n📍 Tehtaankatu 18, Helsinki\n#suutari #helsinki #kenkähuolto`;
+    document.getElementById("aiCaptionText").textContent = fallbackText;
+    document.getElementById("aiCaptionCard").style.display = "block";
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+
+function combineImages() {
+  const select = document.getElementById("socialJobSelect");
+  const jobId = select.value;
+  if (!jobId) return;
+  
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return;
+  
+  const beforeSrc = j.img || "bag.png";
+  const afterSrc = afterImageBase64 || "bag.png";
+  
+  const canvas = document.getElementById("combinedCanvas");
+  const ctx = canvas.getContext("2d");
+  
+  const imgBefore = new Image();
+  const imgAfter = new Image();
+  
+  let loadedCount = 0;
+  function onImageLoaded() {
+    loadedCount++;
+    if (loadedCount === 2) {
+      const width = 1200;
+      const height = 600;
+      canvas.width = width;
+      canvas.height = height;
+      
+      ctx.drawImage(imgBefore, 0, 0, width/2, height);
+      ctx.drawImage(imgAfter, width/2, 0, width/2, height);
+      
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(width/2, 0);
+      ctx.lineTo(width/2, height);
+      ctx.stroke();
+      
+      ctx.fillStyle = "rgba(15, 45, 74, 0.85)";
+      ctx.font = "bold 24px 'Inter', sans-serif";
+      
+      ctx.fillRect(15, 15, 120, 40);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("ENNEN", 30, 44);
+      
+      ctx.fillStyle = "rgba(16, 185, 129, 0.85)";
+      ctx.fillRect(width/2 + 15, 15, 140, 40);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("JÄLKEEN", width/2 + 30, 44);
+      
+      const wm = document.getElementById("watermarkText").value || "Tehtaankatu Suutari";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+      ctx.fillRect(0, height - 50, width, 50);
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "italic 18px 'Inter', sans-serif";
+      ctx.fillText(wm, 25, height - 18);
+      ctx.fillText("✨ Tehty Suomessa", width - 200, height - 18);
+      
+      document.getElementById("combinedCanvasCard").style.display = "block";
+    }
+  }
+  
+  imgBefore.onload = onImageLoaded;
+  imgAfter.onload = onImageLoaded;
+  
+  imgBefore.src = beforeSrc;
+  imgAfter.src = afterSrc;
+}
+
+function downloadCombinedImage() {
+  const canvas = document.getElementById("combinedCanvas");
+  const select = document.getElementById("socialJobSelect");
+  const jobId = select.value || "suutari";
+  
+  const link = document.createElement("a");
+  link.download = `ennen_jalkeen_${jobId}.jpg`;
+  link.href = canvas.toDataURL("image/jpeg", 0.9);
+  link.click();
 }
 
 let selectedShelf = null;
