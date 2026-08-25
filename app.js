@@ -814,14 +814,20 @@ async function parseMessageWithAI(text) {
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
   const targets = [
+    { ver: "v1", model: "gemini-2.5-flash" },
+    { ver: "v1beta", model: "gemini-2.5-flash" },
+    { ver: "v1", model: "gemini-2.5-flash-lite" },
+    { ver: "v1beta", model: "gemini-2.5-flash-lite" },
+    { ver: "v1", model: "gemini-2.5-pro" },
+    { ver: "v1beta", model: "gemini-2.5-pro" },
+    { ver: "v1", model: "gemini-3.5-flash" },
+    { ver: "v1beta", model: "gemini-3.5-flash" },
+    { ver: "v1", model: "gemini-3.6-flash" },
+    { ver: "v1beta", model: "gemini-3.6-flash" },
+    { ver: "v1", model: "gemini-3.7-flash" },
+    { ver: "v1beta", model: "gemini-3.7-flash" },
     { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" },
-    { ver: "v1", model: "gemini-1.5-flash-latest" },
-    { ver: "v1beta", model: "gemini-1.5-flash-latest" },
-    { ver: "v1", model: "gemini-1.5-pro" },
-    { ver: "v1beta", model: "gemini-1.5-pro" },
-    { ver: "v1", model: "gemini-pro" },
-    { ver: "v1beta", model: "gemini-pro" }
+    { ver: "v1beta", model: "gemini-1.5-flash" }
   ];
   
   const prompt = `Lue seuraava WhatsApp-keskustelu tai viesti ja poimi siitä tiedot JSON-muodossa. 
@@ -882,14 +888,20 @@ async function analyzeImageWithAI(base64Data, mimeType) {
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
   const targets = [
+    { ver: "v1", model: "gemini-2.5-flash" },
+    { ver: "v1beta", model: "gemini-2.5-flash" },
+    { ver: "v1", model: "gemini-2.5-flash-lite" },
+    { ver: "v1beta", model: "gemini-2.5-flash-lite" },
+    { ver: "v1", model: "gemini-2.5-pro" },
+    { ver: "v1beta", model: "gemini-2.5-pro" },
+    { ver: "v1", model: "gemini-3.5-flash" },
+    { ver: "v1beta", model: "gemini-3.5-flash" },
+    { ver: "v1", model: "gemini-3.6-flash" },
+    { ver: "v1beta", model: "gemini-3.6-flash" },
+    { ver: "v1", model: "gemini-3.7-flash" },
+    { ver: "v1beta", model: "gemini-3.7-flash" },
     { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" },
-    { ver: "v1", model: "gemini-1.5-flash-latest" },
-    { ver: "v1beta", model: "gemini-1.5-flash-latest" },
-    { ver: "v1", model: "gemini-1.5-pro" },
-    { ver: "v1beta", model: "gemini-1.5-pro" },
-    { ver: "v1", model: "gemini-pro" },
-    { ver: "v1beta", model: "gemini-pro" }
+    { ver: "v1beta", model: "gemini-1.5-flash" }
   ];
   
   const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva vauriosta/tuotteesta ja poimi tiedot JSON-muodossa. 
@@ -1080,14 +1092,20 @@ Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (In
 Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
 
   const targets = [
+    { ver: "v1", model: "gemini-2.5-flash" },
+    { ver: "v1beta", model: "gemini-2.5-flash" },
+    { ver: "v1", model: "gemini-2.5-flash-lite" },
+    { ver: "v1beta", model: "gemini-2.5-flash-lite" },
+    { ver: "v1", model: "gemini-2.5-pro" },
+    { ver: "v1beta", model: "gemini-2.5-pro" },
+    { ver: "v1", model: "gemini-3.5-flash" },
+    { ver: "v1beta", model: "gemini-3.5-flash" },
+    { ver: "v1", model: "gemini-3.6-flash" },
+    { ver: "v1beta", model: "gemini-3.6-flash" },
+    { ver: "v1", model: "gemini-3.7-flash" },
+    { ver: "v1beta", model: "gemini-3.7-flash" },
     { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" },
-    { ver: "v1", model: "gemini-1.5-flash-latest" },
-    { ver: "v1beta", model: "gemini-1.5-flash-latest" },
-    { ver: "v1", model: "gemini-1.5-pro" },
-    { ver: "v1beta", model: "gemini-1.5-pro" },
-    { ver: "v1", model: "gemini-pro" },
-    { ver: "v1beta", model: "gemini-pro" }
+    { ver: "v1beta", model: "gemini-1.5-flash" }
   ];
   let success = false;
   
