@@ -255,14 +255,14 @@ function initSupabase() {
 initSupabase();
 
 async function getJobDetails(code) {
-  // If Supabase is connected, query live DB
+  // If Supabase is connected, call RPC status lookup for maximum privacy!
   if (supabaseClient) {
     try {
-      const { data, error } = await supabaseClient.from("jobs").select("*").eq("id", code).maybeSingle();
+      const { data, error } = await supabaseClient.rpc('get_job_status', { job_id: code });
       if (error) throw error;
-      if (data) return data;
+      if (data && data.length > 0) return data[0];
     } catch(err) {
-      console.error("Supabase query failed, falling back to local:", err);
+      console.error("Supabase RPC lookup failed, falling back to local:", err);
     }
   }
   
