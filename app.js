@@ -152,6 +152,9 @@ function showPage(id){
     document.getElementById("aiStatus").style.display = "none";
     document.getElementById("aiInstructions").value = localStorage.getItem("suutari_ai_instructions") || "";
     document.getElementById("aiInstructionsStatus").style.display = "none";
+    document.getElementById("settingsUser").value = localStorage.getItem("suutari_admin_user") || "suutari";
+    document.getElementById("settingsPass").value = "";
+    document.getElementById("authSettingsStatus").style.display = "none";
   }
 }
 document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dataset.page));
@@ -1241,3 +1244,61 @@ function convertRequestToJob() {
   closeModal();
   openIntake(prefill);
 }
+
+function checkAuth() {
+  const loggedIn = sessionStorage.getItem("suutari_auth");
+  const loginScreen = document.getElementById("loginScreen");
+  if (loggedIn === "true") {
+    loginScreen.style.display = "none";
+  } else {
+    loginScreen.style.display = "flex";
+  }
+}
+
+function login() {
+  const user = document.getElementById("loginUser").value.trim();
+  const pass = document.getElementById("loginPass").value.trim();
+  const storedUser = localStorage.getItem("suutari_admin_user") || "suutari";
+  const storedPass = localStorage.getItem("suutari_admin_pass") || "suutari2026";
+  const errEl = document.getElementById("loginError");
+
+  if (user === storedUser && pass === storedPass) {
+    sessionStorage.setItem("suutari_auth", "true");
+    document.getElementById("loginScreen").style.display = "none";
+    errEl.style.display = "none";
+    document.getElementById("loginUser").value = "";
+    document.getElementById("loginPass").value = "";
+    initData();
+  } else {
+    errEl.style.display = "block";
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem("suutari_auth");
+  checkAuth();
+}
+
+function saveAuthSettings() {
+  const user = document.getElementById("settingsUser").value.trim();
+  const pass = document.getElementById("settingsPass").value.trim();
+  const status = document.getElementById("authSettingsStatus");
+  status.style.display = "block";
+
+  if (!user) {
+    status.textContent = "Käyttäjätunnus ei voi olla tyhjä!";
+    status.style.color = "var(--red)";
+    return;
+  }
+
+  localStorage.setItem("suutari_admin_user", user);
+  if (pass) {
+    localStorage.setItem("suutari_admin_pass", pass);
+  }
+  
+  status.textContent = "Kirjautumisasetukset tallennettu onnistuneesti!";
+  status.style.color = "var(--teal)";
+  document.getElementById("settingsPass").value = "";
+}
+
+checkAuth();

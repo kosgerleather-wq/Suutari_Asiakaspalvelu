@@ -10,6 +10,31 @@
 <link rel="stylesheet" href="styles.css?v=2.0.1">
 </head>
 <body>
+<div id="loginScreen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle at center, #1e3a5f 0%, #0a192f 100%); z-index:99999; display:flex; align-items:center; justify-content:center; font-family:'Inter', sans-serif;">
+  <div style="background:rgba(255, 255, 255, 0.08); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:40px; width:90%; max-width:400px; box-shadow:0 20px 50px rgba(0,0,0,0.3); text-align:center;">
+    <div style="width:70px; height:70px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; font-size:32px; color:white; box-shadow:0 8px 20px rgba(16,185,129,0.3);">✦</div>
+    <h2 style="font-family:'Outfit', sans-serif; font-size:24px; color:white; margin:0 0 8px; font-weight:700;">Kirjaudu sisään</h2>
+    <p style="font-size:13px; color:rgba(255,255,255,0.6); margin:0 0 25px;">Tehtaankatu Suutari · Atelier Flow v2</p>
+    
+    <div style="display:flex; flex-direction:column; gap:15px; text-align:left;">
+      <div>
+        <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.7); display:block; margin-bottom:6px;">Käyttäjätunnus</label>
+        <input type="text" id="loginUser" style="width:100%; box-sizing:border-box; padding:14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:white; font-size:14px; outline:none; font-family:inherit; transition:all 0.3s;" placeholder="Käyttäjätunnus">
+      </div>
+      <div>
+        <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.7); display:block; margin-bottom:6px;">Salasana</label>
+        <input type="password" id="loginPass" style="width:100%; box-sizing:border-box; padding:14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:white; font-size:14px; outline:none; font-family:inherit; transition:all 0.3s;" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+      </div>
+      <button onclick="login()" style="width:100%; padding:14px; background:#10b981; color:white; border:0; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.2s; box-shadow:0 5px 15px rgba(16,185,129,0.2); margin-top:10px;">
+        Kirjaudu
+      </button>
+      <div id="loginError" style="color:#ef4444; font-size:12px; font-weight:600; text-align:center; margin-top:8px; display:none;">
+        Virheellinen käyttäjätunnus tai salasana.
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="shell">
 <aside class="sidebar">
   <div class="brand">
@@ -26,7 +51,10 @@
     <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
     <button data-page="customers">♙ <span>Asiakkaat</span></button>
   </nav>
-  <div class="side-bottom"><button data-page="settings">⚙ <span>Asetukset</span></button></div>
+  <div class="side-bottom" style="display:flex; flex-direction:column; gap:4px;">
+    <button data-page="settings">⚙ <span>Asetukset</span></button>
+    <button onclick="logout()" style="color:var(--red); border-top:1px solid var(--border); margin-top:4px; padding-top:10px; display:flex; align-items:center; gap:8px; background:transparent; border-left:0; border-right:0; border-bottom:0; cursor:pointer;">🚪 <span>Kirjaudu ulos</span></button>
+  </div>
 </aside>
 
 <main>
@@ -458,6 +486,27 @@
   </div>
 
   <div class="card" style="max-width: 600px; margin-top: 20px;">
+    <div class="card-title"><h2>Kirjautumisasetukset (Giriş Şifresi)</h2></div>
+    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;">
+      Muuta hallintapaneelin käyttäjätunnusta ja salasanaa.
+    </p>
+    <div class="form">
+      <div class="field">
+        <label>Käyttäjätunnus (Käyttäjä)</label>
+        <input type="text" id="settingsUser" placeholder="suutari">
+      </div>
+      <div class="field">
+        <label>Uusi salasana (Uusi salasana)</label>
+        <input type="password" id="settingsPass" placeholder="••••••••">
+      </div>
+    </div>
+    <div style="margin-top: 20px;">
+      <button class="wide-btn" onclick="saveAuthSettings()" style="background: var(--primary); color: white; border: 0;">Tallenna kirjautumisasetukset</button>
+    </div>
+    <div id="authSettingsStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
+  </div>
+
+  <div class="card" style="max-width: 600px; margin-top: 20px;">
     <div class="card-title"><h2>SQL-alustusohje</h2></div>
     <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
       Jotta tietokanta toimii oikein, sinun on suoritettava SQL-komennot Supabase-hallintapaneelin SQL Editorissa. Voit kopioida tarvittavan SQL-koodin painamalla alla olevaa painiketta.
@@ -572,6 +621,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.1.0"></script>
+<script src="app.js?v=2.1.1"></script>
 </body>
 </html>
