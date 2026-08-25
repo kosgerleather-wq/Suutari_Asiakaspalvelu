@@ -1027,7 +1027,8 @@ function loadJobForSocial() {
     afterPreview.style.display = "none";
     afterDropText.style.display = "block";
   }
-  
+}
+
 async function generateAISocialPost() {
   const select = document.getElementById("socialJobSelect");
   const jobId = select.value;
@@ -1277,6 +1278,47 @@ function convertRequestToJob() {
   closeModal();
   openIntake(prefill);
 }
+
+async function testAISettings() {
+  const key = document.getElementById("geminiKey").value.trim();
+  const statusEl = document.getElementById("aiStatus");
+  statusEl.style.display = "block";
+  statusEl.textContent = "Testataan AI-yhteyttä...";
+  statusEl.style.color = "var(--text-muted)";
+
+  if (!key) {
+    statusEl.textContent = "Syötä ensin API-avain.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${key}`);
+    const data = await res.json();
+    
+    if (!res.ok) {
+      const errMsg = data.error ? data.error.message : "Tuntematon virhe";
+      statusEl.textContent = `Yhteys epäonnistui: ${errMsg}`;
+      statusEl.style.color = "var(--red)";
+      alert(`Google Gemini API Yhteysvirhe:\n\n${errMsg}`);
+      return;
+    }
+
+    if (data.models && data.models.length > 0) {
+      const modelNames = data.models.map(m => m.name.replace("models/", "")).join(", ");
+      statusEl.textContent = "Yhteys onnistui! Saatavilla olevat tekoälymallit: " + modelNames;
+      statusEl.style.color = "var(--teal)";
+      alert("AI-yhteys toimii loistavasti!\n\nSaatavilla olevat mallit avaimellesi:\n" + modelNames);
+    } else {
+      statusEl.textContent = "Yhteys onnistui, mutta yhtään mallia ei ole saatavilla tälle avaimelle.";
+      statusEl.style.color = "orange";
+      alert("Google API vastasi, mutta yhtään mallia ei palautettu. API-avaimessa saattaa olla rajoituksia.");
+    }
+  } catch (err) {
+    statusEl.textContent = "Verkkovirhe testauksessa: " + err.message;
+    statusEl.style.color = "var(--red)";
+    alert("Yhteyden testauksessa tapahtui verkkovirhe: " + err.message);
+  }
 }
 
 

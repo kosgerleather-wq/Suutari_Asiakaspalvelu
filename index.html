@@ -435,8 +435,9 @@
         <input type="password" id="geminiKey" placeholder="AIzaSy...">
       </div>
     </div>
-    <div style="margin-top: 20px;">
+    <div style="margin-top: 20px; display: flex; gap: 10px;">
       <button class="wide-btn" onclick="saveGeminiSettings()" style="background: var(--primary); color: white; border: 0;">Tallenna AI-asetukset</button>
+      <button class="wide-btn" onclick="testAISettings()" style="background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal);">Testaa AI-yhteys</button>
     </div>
     <div id="aiStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
   </div>
@@ -594,6 +595,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.1.9"></script>
+<script src="app.js?v=2.2.0"></script>
 </body>
 </html>
