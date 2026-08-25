@@ -150,6 +150,8 @@ function showPage(id){
     document.getElementById("connStatus").style.display = "none";
     document.getElementById("geminiKey").value = localStorage.getItem("suutari_gemini_key") || "";
     document.getElementById("aiStatus").style.display = "none";
+    document.getElementById("aiInstructions").value = localStorage.getItem("suutari_ai_instructions") || "";
+    document.getElementById("aiInstructionsStatus").style.display = "none";
   }
 }
 document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dataset.page));
@@ -590,8 +592,11 @@ function guessFields(text){
 function fillExtracted(text,defaults={}){
   const g=guessFields(text);
   document.getElementById("exName").value=defaults.name||"";
+  document.getElementById("exPhone").value=defaults.phone||"";
   document.getElementById("exProduct").value=defaults.product||g.product;
   document.getElementById("exWork").value=defaults.work||g.work;
+  document.getElementById("exPrice").value=defaults.price||"";
+  document.getElementById("exReplyText").value=defaults.reply||"";
   document.getElementById("exMessage").value=text||"WhatsApp-viestistä tuotu kysely.";
   document.getElementById("extracted").style.display="block";
 }
@@ -600,8 +605,7 @@ async function showExtracted(){
   const apiKey = localStorage.getItem("suutari_gemini_key");
   
   if (!apiKey) {
-    // Clean manual entry fallback - no mock handbag data
-    fillExtracted("", {name: "", product: "", work: ""});
+    fillExtracted("", {name: "", phone: "", product: "", work: "", price: "", reply: ""});
     return;
   }
 
@@ -620,13 +624,15 @@ async function showExtracted(){
   
   if (result) {
     fillExtracted("", {
-      name: "Asiakas",
+      name: result.name || "Asiakas",
+      phone: result.phone || "",
       product: result.product || "",
-      work: result.work || ""
+      work: result.work || "",
+      price: result.price || "",
+      reply: result.reply || ""
     });
   } else {
-    // Fallback to clean manual entry if API fails
-    fillExtracted("", {name: "", product: "", work: ""});
+    fillExtracted("", {name: "", phone: "", product: "", work: "", price: "", reply: ""});
   }
 }
 
@@ -636,9 +642,8 @@ async function extractFromText(){
   
   const apiKey = localStorage.getItem("suutari_gemini_key");
   if (!apiKey) {
-    // Use local regex parser offline for text parsing!
     const g = guessFields(t);
-    fillExtracted(t, {name: "Asiakas", product: g.product, work: g.work});
+    fillExtracted(t, {name: "Asiakas", phone: "", product: g.product, work: g.work, price: "", reply: ""});
     return;
   }
 
@@ -658,12 +663,15 @@ async function extractFromText(){
   if (result) {
     fillExtracted(t, {
       name: result.name || "Asiakas",
+      phone: result.phone || "",
       product: result.product || "",
-      work: result.work || ""
+      work: result.work || "",
+      price: result.price || "",
+      reply: result.reply || ""
     });
   } else {
     const g = guessFields(t);
-    fillExtracted(t, {name: "Asiakas", product: g.product, work: g.work});
+    fillExtracted(t, {name: "Asiakas", phone: "", product: g.product, work: g.work, price: "", reply: ""});
   }
 }
 function saveImportedRequest(){
@@ -801,13 +809,22 @@ async function parseMessageWithAI(text) {
   const apiKey = localStorage.getItem("suutari_gemini_key");
   if (!apiKey) return null;
   
+  const instructions = localStorage.getItem("suutari_ai_instructions") || "";
+  
   const prompt = `Lue seuraava WhatsApp-keskustelu tai viesti ja poimi siitä tiedot JSON-muodossa. 
 Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
+
+Tässä ovat ateljeen omistajan antamat hinnasto- ja työsäännöt, joita sinun on EHDOTTOMASTI noudatettava tehdessäsi hinta-arviota ja vastausta:
+${instructions}
+
 JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 {
-  "name": "Asiakkaan nimi",
+  "name": "Asiakkaan nimi (jos löytyy, muuten tyhjä)",
+  "phone": "Asiakkaan puhelinnumero (jos löytyy, muuten tyhjä)",
   "product": "Tuote Finceksi (esim. Käsilaukku, Nahkakengät, Takki)",
-  "work": "Tarvittava korjaustyö Finceksi lyhyesti (esim. Vetoketjun korjaus, Koron korjaus)"
+  "work": "Tarvittava korjaustyö Finceksi lyhyesti (esim. Vetoketjun korjaus, Koron korjaus)",
+  "price": "Arvioitu hinta numeroina (esim. 45)",
+  "reply": "Kunnioittava ja ystävällinen vastaus viestiin Fince. Ehdota arvioitua hintaa ja toivota heidät tervetulleiksi tuomaan tuote Tehtaankatu 18 -liikkeeseemme."
 }
 
 Viesti:
@@ -835,13 +852,22 @@ async function analyzeImageWithAI(base64Data, mimeType) {
   const apiKey = localStorage.getItem("suutari_gemini_key");
   if (!apiKey) return null;
   
-  const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva hasarista/tuotteesta ja poimi tiedot JSON-muodossa. 
+  const instructions = localStorage.getItem("suutari_ai_instructions") || "";
+  
+  const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva vauriosta/tuotteesta ja poimi tiedot JSON-muodossa. 
 Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
+
+Tässä ovat ateljeen omistajan antamat hinnasto- ja työsäännöt, joita sinun on EHDOTTOMASTI noudatettava tehdessäsi hinta-arviota ja vastausta:
+${instructions}
+
 JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 {
-  "name": "Asiakas (jätä tyhjäksi)",
+  "name": "Asiakas",
+  "phone": "",
   "product": "Tunnistettu tuote Finceksi (esim. Käsilaukku, Kengät, Saappaat)",
-  "work": "Tarvittava korjaustyö kuvan perusteella Finceksi lyhyesti (esim. Vetoketjun vaihto, Koron uusiminen, Sauman tikkaus)"
+  "work": "Tarvittava korjaustyö kuvan perusteella Finceksi lyhyesti (esim. Vetoketjun vaihto, Koron uusiminen, Sauman tikkaus)",
+  "price": "Arvioitu hinta numeroina (esim. 45)",
+  "reply": "Kunnioittava ja ystävällinen vastaus asiakkaan kuvaan Fince. Ehdota vaurion perusteella arvioitua hintaa ja toivota heidät tervetulleiksi tuomaan tuote Tehtaankatu 18 -liikkeeseemme."
 }
 
 Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mukaan.`;
@@ -1185,4 +1211,33 @@ function showShelfDetails(shelfCode) {
       </div>
     </div>
   `).join("");
+}
+
+function saveAIInstructions() {
+  const text = document.getElementById("aiInstructions").value;
+  localStorage.setItem("suutari_ai_instructions", text);
+  const status = document.getElementById("aiInstructionsStatus");
+  status.textContent = "AI-ohjeet tallennettu onnistuneesti!";
+  status.style.color = "var(--teal)";
+  status.style.display = "block";
+}
+
+function sendWhatsAppReply() {
+  const phone = document.getElementById("exPhone").value.replace(/[^0-9+]/g, "") || "0400000000";
+  const replyText = encodeURIComponent(document.getElementById("exReplyText").value);
+  const link = `https://wa.me/${phone}?text=${replyText}`;
+  window.open(link, "_blank");
+}
+
+function convertRequestToJob() {
+  const prefill = {
+    name: document.getElementById("exName").value,
+    phone: document.getElementById("exPhone").value,
+    product: document.getElementById("exProduct").value,
+    work: document.getElementById("exWork").value,
+    price: document.getElementById("exPrice").value,
+    img: uploadedImageBase64 || null
+  };
+  closeModal();
+  openIntake(prefill);
 }

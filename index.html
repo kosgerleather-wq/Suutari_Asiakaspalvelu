@@ -439,7 +439,24 @@
     </div>
     <div id="aiStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
   </div>
-  
+
+  <div class="card" style="max-width: 600px; margin-top: 20px;">
+    <div class="card-title"><h2>AI-apurin ohjeet ja hinnasto</h2></div>
+    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;">
+      Kirjoita tähän ateljeesi hinnasto ja säännöt Fince tai Türkçe. Tekoäly lukee nämä ohjeet aina kun se tekee hinta- ja työarvioita.
+    </p>
+    <div class="form">
+      <div class="field full">
+        <label>Hinnasto & ohjeet</label>
+        <textarea id="aiInstructions" style="width:100%; height:180px; padding:10px; border-radius:8px; border:1px solid var(--border-color); box-sizing:border-box; font-family:inherit; font-size:13px; line-height:1.5;" placeholder="Esim.&#10;Korkolappujen vaihto: 30-40 EUR&#10;Vetoketjun vaihto laukkuun: 45-60 EUR&#10;Arvioitu toimitusaika on aina 3-5 arkipäivää."></textarea>
+      </div>
+    </div>
+    <div style="margin-top: 20px;">
+      <button class="wide-btn" onclick="saveAIInstructions()" style="background: var(--primary); color: white; border: 0;">Tallenna ohjeet</button>
+    </div>
+    <div id="aiInstructionsStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
+  </div>
+
   <div class="card" style="max-width: 600px; margin-top: 20px;">
     <div class="card-title"><h2>SQL-alustusohje</h2></div>
     <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
@@ -522,8 +539,10 @@
       <div class="extract-head"><b>✓ Poimitut tiedot</b><span>Voit muokata ennen tallennusta</span></div>
       <div class="extract-grid">
         <label>Asiakas<input id="exName" placeholder="Asiakkaan nimi"></label>
+        <label>Puhelin<input id="exPhone" placeholder="Esim. 0401234567"></label>
         <label>Tuote<input id="exProduct" placeholder="Esim. Käsilaukku"></label>
         <label>Korjaus / ongelma<input id="exWork" placeholder="Esim. Vetoketjun korjaus"></label>
+        <label>Arvioitu hinta (€)<input id="exPrice" type="number" placeholder="45"></label>
         <label>Tila
           <select id="exStatus">
             <option value="new">🟠 Uusi kysely</option>
@@ -533,15 +552,26 @@
         </label>
       </div>
       <label class="full-label">Asiakkaan viesti<textarea id="exMessage"></textarea></label>
-      <div class="extract-actions">
+      <label class="full-label" style="margin-top:10px;">Ehdotettu WhatsApp-vastaus (Suomi)<textarea id="exReplyText" style="height:110px;"></textarea></label>
+      
+      <div style="display:flex; gap:10px; margin-top:15px;">
+        <button class="save" onclick="sendWhatsAppReply()" style="background:#25d366; color:white; border:0; display:flex; align-items:center; justify-content:center; gap:6px; flex:1; padding:12px; border-radius:9px; font-weight:700; cursor:pointer;">
+          💬 Vastaa WhatsAppilla
+        </button>
+        <button class="save" onclick="convertRequestToJob()" style="background:var(--primary); color:white; border:0; display:flex; align-items:center; justify-content:center; gap:6px; flex:1; padding:12px; border-radius:9px; font-weight:700; cursor:pointer;">
+          🔧 Luo Työ (Kabul)
+        </button>
+      </div>
+      
+      <div class="extract-actions" style="margin-top:15px; border-top:1px solid var(--border-color); padding-top:15px;">
         <button class="cancel-small" onclick="closeImportModal()">Peruuta</button>
-        <button class="save-import" onclick="saveImportedRequest()">✓ Tallenna kyselynä</button>
+        <button class="save-import" onclick="saveImportedRequest()">Tallenna vain kyselynä</button>
       </div>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2.0.9"></script>
+<script src="app.js?v=2.1.0"></script>
 </body>
 </html>
