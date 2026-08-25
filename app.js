@@ -258,11 +258,15 @@ function openIntake(prefill=null){
   </div>
   <div class="field full"><label>Sisäinen huomautus</label><textarea id="note">${prefill?"Siirretty WhatsApp-tiedustelusta.":""}</textarea></div>
 </div>
-<div class="modal-actions"><button class="cancel" onclick="closeModal()">Peruuta</button><button class="save" onclick="saveJob()">LUO TYÖ + ANNA SEURANTAKOODI</button></div>`;
+<div class="modal-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+  <button class="cancel" onclick="closeModal()">Peruuta</button>
+  <button class="save" onclick="saveJob(true)" style="background:var(--teal); color:white; border:0;">TALLENNA & LISÄÄ TOINEN TUOTE</button>
+  <button class="save" onclick="saveJob(false)" style="background:var(--primary); color:white; border:0;">TALLENNA & VALMIS</button>
+</div>`;
   document.getElementById("modal").classList.remove("hidden");
 }
 
-function saveJob(){
+function saveJob(addAnother = false){
   let d=document.getElementById("date").value;
   let j={
     id:"#"+(1050+jobs.length),
@@ -280,10 +284,47 @@ function saveJob(){
   jobs.unshift(j);
   saveState();
   dbInsertJob(j);
-  closeModal();
   renderHome();
-  openJob(j.id);
-  intakeImageBase64 = null;
+  
+  if (addAnother) {
+    // Reset product fields, but keep name and phone
+    document.getElementById("prod").value = "";
+    document.getElementById("work").value = "";
+    document.getElementById("price").value = "45";
+    document.getElementById("note").value = "";
+    
+    // Reset image
+    intakeImageBase64 = null;
+    const intakePreview = document.getElementById("intakePreview");
+    if (intakePreview) {
+      intakePreview.src = "";
+      intakePreview.style.display = "none";
+    }
+    const intakeDropContent = document.getElementById("intakeDropContent");
+    if (intakeDropContent) {
+      intakeDropContent.style.display = "block";
+    }
+    
+    // Show feedback alert in modal
+    const feedback = document.createElement("div");
+    feedback.style.color = "var(--teal)";
+    feedback.style.fontSize = "13px";
+    feedback.style.fontWeight = "600";
+    feedback.style.marginTop = "15px";
+    feedback.style.textAlign = "center";
+    feedback.id = "intakeFeedback";
+    feedback.textContent = `✓ Työ tallennettu! Seurantakoodi: ${j.id}. Voit syöttää seuraavan tuotteen.`;
+    
+    const existingFeedback = document.getElementById("intakeFeedback");
+    if (existingFeedback) existingFeedback.remove();
+    
+    document.querySelector(".modal-box").appendChild(feedback);
+    setTimeout(() => { if(feedback) feedback.remove(); }, 5000);
+  } else {
+    closeModal();
+    openJob(j.id);
+    intakeImageBase64 = null;
+  }
 }
 
 let currentJobFilter = "all";
