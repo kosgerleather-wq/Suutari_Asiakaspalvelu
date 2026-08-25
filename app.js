@@ -1295,6 +1295,7 @@ function login() {
     document.getElementById("loginPass").value = "";
     initData();
   } else {
+    errEl.innerHTML = `Virheellinen käyttäjätunnus tai salasana.<br><span style="font-size:10px;opacity:0.6;display:block;margin-top:4px;">(Odotettu: ${storedUser} / ${storedPass})</span>`;
     errEl.style.display = "block";
   }
 }
