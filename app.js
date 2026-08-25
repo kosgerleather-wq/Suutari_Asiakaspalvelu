@@ -813,6 +813,7 @@ async function parseMessageWithAI(text) {
   if (!apiKey) return null;
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
+  const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
   
   const prompt = `Lue seuraava WhatsApp-keskustelu tai viesti ja poimi siitä tiedot JSON-muodossa. 
 Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
@@ -833,37 +834,33 @@ JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 Viesti:
 "${text}"`;
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      const errMsg = data.error ? data.error.message : "Tuntematon virhe API-kutsussa.";
-      alert("Google Gemini API Virhe: " + errMsg);
-      return null;
+  for (const model of models) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidates && data.candidates[0]) {
+        const resultText = data.candidates[0].content.parts[0].text.trim();
+        let cleanText = resultText.trim();
+        const firstBracket = cleanText.indexOf('{');
+        const lastBracket = cleanText.lastIndexOf('}');
+        if (firstBracket !== -1 && lastBracket !== -1) {
+          cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+        }
+        return JSON.parse(cleanText);
+      }
+    } catch (err) {
+      console.warn(`Model ${model} failed on parse message, trying next...`, err);
     }
-    if (!data.candidates || !data.candidates[0]) {
-      alert("Google Gemini API Virhe: Tyhjä vastaus.");
-      return null;
-    }
-    const resultText = data.candidates[0].content.parts[0].text.trim();
-    let cleanText = resultText.trim();
-    const firstBracket = cleanText.indexOf('{');
-    const lastBracket = cleanText.lastIndexOf('}');
-    if (firstBracket !== -1 && lastBracket !== -1) {
-      cleanText = cleanText.substring(firstBracket, lastBracket + 1);
-    }
-    return JSON.parse(cleanText);
-  } catch (err) {
-    console.error("Gemini parse message error:", err);
-    alert("Virhe viestin analysoinnissa: " + err.message);
-    return null;
   }
+  
+  alert("Google Gemini API Virhe: Mikään käytettävissä olevista malleista (Gemini 1.5 Flash, Gemini Pro) ei vastannut. Varmista, että API-avaimesi on luotu oikein Google AI Studiossa.");
+  return null;
 }
 
 async function analyzeImageWithAI(base64Data, mimeType) {
@@ -871,6 +868,7 @@ async function analyzeImageWithAI(base64Data, mimeType) {
   if (!apiKey) return null;
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
+  const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
   
   const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva vauriosta/tuotteesta ja poimi tiedot JSON-muodossa. 
 Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
@@ -890,47 +888,43 @@ JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 
 Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mukaan.`;
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
+  for (const model of models) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data
+                }
               }
-            }
-          ]
-        }]
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      const errMsg = data.error ? data.error.message : "Tuntematon virhe API-kutsussa.";
-      alert("Google Gemini API Virhe: " + errMsg);
-      return null;
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidates && data.candidates[0]) {
+        const resultText = data.candidates[0].content.parts[0].text.trim();
+        let cleanText = resultText.trim();
+        const firstBracket = cleanText.indexOf('{');
+        const lastBracket = cleanText.lastIndexOf('}');
+        if (firstBracket !== -1 && lastBracket !== -1) {
+          cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+        }
+        return JSON.parse(cleanText);
+      }
+    } catch (err) {
+      console.warn(`Model ${model} failed on image analysis, trying next...`, err);
     }
-    if (!data.candidates || !data.candidates[0]) {
-      alert("Google Gemini API Virhe: Tyhjä vastaus.");
-      return null;
-    }
-    const resultText = data.candidates[0].content.parts[0].text.trim();
-    let cleanText = resultText.trim();
-    const firstBracket = cleanText.indexOf('{');
-    const lastBracket = cleanText.lastIndexOf('}');
-    if (firstBracket !== -1 && lastBracket !== -1) {
-      cleanText = cleanText.substring(firstBracket, lastBracket + 1);
-    }
-    return JSON.parse(cleanText);
-  } catch (err) {
-    console.error("Gemini analyze image error:", err);
-    alert("Virhe kuvan analysoinnissa: " + err.message);
-    return null;
   }
+  
+  alert("Google Gemini API Virhe: Kuvan analysointi epäonnistui kaikilla saatavilla olevilla malleilla. Varmista API-avain.");
+  return null;
 }
 
 let afterImageBase64 = null;
@@ -1026,17 +1020,6 @@ function loadJobForSocial() {
     afterDropText.style.display = "block";
   }
   
-  document.getElementById("combinedCanvasCard").style.display = "none";
-  document.getElementById("aiCaptionCard").style.display = "none";
-}
-
-function copyCaption() {
-  const text = document.getElementById("aiCaptionText").textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    alert("Julkaisuteksti kopioitu leikepöydälle!");
-  });
-}
-
 async function generateAISocialPost() {
   const select = document.getElementById("socialJobSelect");
   const jobId = select.value;
@@ -1069,28 +1052,40 @@ Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (In
 
 Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
-    const data = await res.json();
-    const caption = data.candidates[0].content.parts[0].text.trim();
-    document.getElementById("aiCaptionText").textContent = caption;
-    document.getElementById("aiCaptionCard").style.display = "block";
-  } catch (err) {
-    console.error("Gemini social media generator error:", err);
+  const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
+  let success = false;
+  
+  for (const model of models) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidates && data.candidates[0]) {
+        const caption = data.candidates[0].content.parts[0].text.trim();
+        document.getElementById("aiCaptionText").textContent = caption;
+        document.getElementById("aiCaptionCard").style.display = "block";
+        success = true;
+        break;
+      }
+    } catch (err) {
+      console.warn(`Social generator model ${model} failed, trying next...`, err);
+    }
+  }
+  
+  if (!success) {
     alert("AI-tekstin luominen epäonnistui. Käytetään valmista pohjaa.");
     const fallbackText = `🔨 Ennen & Jälkeen - Korjaus valmis!\n\nTeimme upean korjauksen tähän tuotteeseen: ${j.product} (${j.work}). Kengät tai laukku ovat nyt valmiina uusiin seikkailuihin! \n\nTervetuloa huoltamaan suosikkituotteesi ateljeehenne.\n\n📍 Tehtaankatu 18, Helsinki\n#suutari #helsinki #kenkähuolto`;
     document.getElementById("aiCaptionText").textContent = fallbackText;
     document.getElementById("aiCaptionCard").style.display = "block";
-  } finally {
-    btn.textContent = oldText;
-    btn.disabled = false;
   }
+  
+  btn.textContent = oldText;
+  btn.disabled = false;
 }
 
 function combineImages() {

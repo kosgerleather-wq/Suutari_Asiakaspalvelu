@@ -2466,6 +2466,15 @@ main {
   .mobile-nav small {
     font-size: 8px;
   }
+  #importPreview {
+    max-width: 100%;
+    max-height: 180px;
+    border-radius: var(--radius-sm);
+    object-fit: contain;
+    margin-top: 15px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+  }
 }
 
 /* Shelf Layout & Map */
