@@ -834,7 +834,7 @@ Viesti:
 "${text}"`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -891,7 +891,7 @@ JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mukaan.`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1070,7 +1070,7 @@ Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (In
 Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
