@@ -842,11 +842,26 @@ Viesti:
       })
     });
     const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data.error ? data.error.message : "Tuntematon virhe API-kutsussa.";
+      alert("Google Gemini API Virhe: " + errMsg);
+      return null;
+    }
+    if (!data.candidates || !data.candidates[0]) {
+      alert("Google Gemini API Virhe: Tyhjä vastaus.");
+      return null;
+    }
     const resultText = data.candidates[0].content.parts[0].text.trim();
-    const jsonStr = resultText.replace(/```json/i, "").replace(/```/, "").trim();
-    return JSON.parse(jsonStr);
+    let cleanText = resultText.trim();
+    const firstBracket = cleanText.indexOf('{');
+    const lastBracket = cleanText.lastIndexOf('}');
+    if (firstBracket !== -1 && lastBracket !== -1) {
+      cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+    }
+    return JSON.parse(cleanText);
   } catch (err) {
     console.error("Gemini parse message error:", err);
+    alert("Virhe viestin analysoinnissa: " + err.message);
     return null;
   }
 }
@@ -894,11 +909,26 @@ Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mu
       })
     });
     const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data.error ? data.error.message : "Tuntematon virhe API-kutsussa.";
+      alert("Google Gemini API Virhe: " + errMsg);
+      return null;
+    }
+    if (!data.candidates || !data.candidates[0]) {
+      alert("Google Gemini API Virhe: Tyhjä vastaus.");
+      return null;
+    }
     const resultText = data.candidates[0].content.parts[0].text.trim();
-    const jsonStr = resultText.replace(/```json/i, "").replace(/```/, "").trim();
-    return JSON.parse(jsonStr);
+    let cleanText = resultText.trim();
+    const firstBracket = cleanText.indexOf('{');
+    const lastBracket = cleanText.lastIndexOf('}');
+    if (firstBracket !== -1 && lastBracket !== -1) {
+      cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+    }
+    return JSON.parse(cleanText);
   } catch (err) {
     console.error("Gemini analyze image error:", err);
+    alert("Virhe kuvan analysoinnissa: " + err.message);
     return null;
   }
 }
