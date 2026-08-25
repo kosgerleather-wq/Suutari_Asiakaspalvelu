@@ -834,6 +834,7 @@ JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 Viesti:
 "${text}"`;
 
+  let lastErrorMsg = "Tuntematon virhe";
   for (const model of models) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
@@ -853,13 +854,16 @@ Viesti:
           cleanText = cleanText.substring(firstBracket, lastBracket + 1);
         }
         return JSON.parse(cleanText);
+      } else if (data.error) {
+        lastErrorMsg = data.error.message;
       }
     } catch (err) {
       console.warn(`Model ${model} failed on parse message, trying next...`, err);
+      lastErrorMsg = err.message;
     }
   }
   
-  alert("Google Gemini API Virhe: Mikään käytettävissä olevista malleista (Gemini 1.5 Flash, Gemini Pro) ei vastannut. Varmista, että API-avaimesi on luotu oikein Google AI Studiossa.");
+  alert(`Google Gemini API Virhe: Mikään kokeilluista tekoälymalleista ei vastannut.\n\nPalvelimen virhe: "${lastErrorMsg}"\n\nVarmista, että API-avaimesi on luotu oikein Google AI Studiossa.`);
   return null;
 }
 
@@ -888,6 +892,7 @@ JSON-objektin on oltava täsmälleen seuraavassa muodossa:
 
 Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mukaan.`;
 
+  let lastErrorMsg = "Tuntematon virhe";
   for (const model of models) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
@@ -917,13 +922,16 @@ Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mu
           cleanText = cleanText.substring(firstBracket, lastBracket + 1);
         }
         return JSON.parse(cleanText);
+      } else if (data.error) {
+        lastErrorMsg = data.error.message;
       }
     } catch (err) {
       console.warn(`Model ${model} failed on image analysis, trying next...`, err);
+      lastErrorMsg = err.message;
     }
   }
   
-  alert("Google Gemini API Virhe: Kuvan analysointi epäonnistui kaikilla saatavilla olevilla malleilla. Varmista API-avain.");
+  alert(`Google Gemini API Virhe: Kuvan analysointi epäonnistui kaikilla malleilla.\n\nPalvelimen virhe: "${lastErrorMsg}"\n\nVarmista API-avain.`);
   return null;
 }
 
