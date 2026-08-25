@@ -1281,10 +1281,10 @@ function checkAuth() {
 }
 
 function login() {
-  const user = document.getElementById("loginUser").value.trim();
+  const user = document.getElementById("loginUser").value.trim().toLowerCase();
   const pass = document.getElementById("loginPass").value.trim();
-  const storedUser = localStorage.getItem("suutari_admin_user") || "suutari";
-  const storedPass = localStorage.getItem("suutari_admin_pass") || "suutari2026";
+  const storedUser = (localStorage.getItem("suutari_admin_user") || "suutari").trim().toLowerCase();
+  const storedPass = (localStorage.getItem("suutari_admin_pass") || "suutari2026").trim();
   const errEl = document.getElementById("loginError");
 
   if (user === storedUser && pass === storedPass) {
