@@ -68,6 +68,17 @@ async function dbInsertJob(j) {
   }
 }
 
+async function dbDeleteJob(id) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("jobs").delete().eq("id", id);
+      if(error) console.error("Supabase delete job error:", error);
+    } catch(err) {
+      console.error(err);
+    }
+  }
+}
+
 async function dbUpdateJobStatus(id, status) {
   if (supabaseClient) {
     try {
@@ -434,7 +445,10 @@ function openJob(id){
         </div>
       </div>
     </div>
-    <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${steps.map((s,i)=>`<div class="step ${i<3?"done":i===3&&j.status==="ready"?"active":""}"><i></i><div><b>${s}</b><small>${i===0?"23.08.2026":i===2?"Nyt":i===4?j.date:""}</small></div></div>`).join("")}</div><button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer" onclick="openStatus('${j.id}')">PÄIVITÄ TILA</button></div>
+    <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${steps.map((s,i)=>`<div class="step ${i<3?"done":i===3&&j.status==="ready"?"active":""}"><i></i><div><b>${s}</b><small>${i===0?"23.08.2026":i===2?"Nyt":i===4?j.date:""}</small></div></div>`).join("")}</div>
+      <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer" onclick="openStatus('${j.id}')">PÄIVITÄ TILA</button>
+      <button class="delete-btn" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:#ef4444;color:white;font-weight:600;" onclick="deleteJob('${j.id}')">🗑️ POISTA TYÖ</button>
+    </div>
   </div>`;
   showPage("job");
 }
@@ -860,7 +874,7 @@ async function testConnection() {
 }
 
 function copySQLSetup() {
-  const sql = `-- Create requests table\\nCREATE TABLE IF NOT EXISTS requests (\\n    id BIGINT PRIMARY KEY,\\n    name TEXT,\\n    product TEXT,\\n    work TEXT,\\n    status TEXT,\\n    img TEXT,\\n    msg TEXT,\\n    reply TEXT,\\n    source TEXT,\\n    request_id TEXT UNIQUE,\\n    customer_id TEXT,\\n    created_at TEXT,\\n    price TEXT,\\n    job_id TEXT\\n);\\n\\n-- Create jobs table\\nCREATE TABLE IF NOT EXISTS jobs (\\n    id TEXT PRIMARY KEY,\\n    name TEXT,\\n    phone TEXT,\\n    product TEXT,\\n    work TEXT,\\n    price NUMERIC,\\n    date TEXT,\\n    status TEXT,\\n    loc TEXT,\\n    img TEXT,\\n    img_after TEXT,\\n    note TEXT,\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\\n);\\n\\n-- Enable Row Level Security (RLS)\\nALTER TABLE requests ENABLE ROW LEVEL SECURITY;\\nALTER TABLE jobs ENABLE ROW LEVEL SECURITY;\\n\\n-- Create policies for public access\\nCREATE POLICY "Allow public read" ON requests FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON requests FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON requests FOR UPDATE USING (true);\\n\\nCREATE POLICY "Allow public read" ON jobs FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON jobs FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON jobs FOR UPDATE USING (true);\\n\\n-- SECURITY UPDATE: Secure lookup function for customers (hides phone and names)\\nCREATE OR REPLACE FUNCTION get_job_status(job_id TEXT)\\nRETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT) AS $$\\nBEGIN\\n  RETURN QUERY\\n  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after\\n  FROM jobs j\\n  WHERE j.id = job_id;\\nEND;\\n$$ LANGUAGE plpgsql SECURITY DEFINER;\\n\\n-- Grant execute permissions\\nGRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO anon;\\nGRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;`;
+  const sql = `-- Create requests table\\nCREATE TABLE IF NOT EXISTS requests (\\n    id BIGINT PRIMARY KEY,\\n    name TEXT,\\n    product TEXT,\\n    work TEXT,\\n    status TEXT,\\n    img TEXT,\\n    msg TEXT,\\n    reply TEXT,\\n    source TEXT,\\n    request_id TEXT UNIQUE,\\n    customer_id TEXT,\\n    created_at TEXT,\\n    price TEXT,\\n    job_id TEXT\\n);\\n\\n-- Create jobs table\\nCREATE TABLE IF NOT EXISTS jobs (\\n    id TEXT PRIMARY KEY,\\n    name TEXT,\\n    phone TEXT,\\n    product TEXT,\\n    work TEXT,\\n    price NUMERIC,\\n    date TEXT,\\n    status TEXT,\\n    loc TEXT,\\n    img TEXT,\\n    img_after TEXT,\\n    note TEXT,\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\\n);\\n\\n-- Enable Row Level Security (RLS)\\nALTER TABLE requests ENABLE ROW LEVEL SECURITY;\\nALTER TABLE jobs ENABLE ROW LEVEL SECURITY;\\n\\n-- Create policies for public access\\nCREATE POLICY "Allow public read" ON requests FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON requests FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON requests FOR UPDATE USING (true);\\nCREATE POLICY "Allow public delete" ON requests FOR DELETE USING (true);\\n\\nCREATE POLICY "Allow public read" ON jobs FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON jobs FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON jobs FOR UPDATE USING (true);\\nCREATE POLICY "Allow public delete" ON jobs FOR DELETE USING (true);\\n\\n-- SECURITY UPDATE: Secure lookup function for customers (hides phone and names)\\nCREATE OR REPLACE FUNCTION get_job_status(job_id TEXT)\\nRETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT) AS $$\\nBEGIN\\n  RETURN QUERY\\n  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after\\n  FROM jobs j\\n  WHERE j.id = job_id;\\nEND;\\n$$ LANGUAGE plpgsql SECURITY DEFINER;\\n\\n-- Grant execute permissions\\nGRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO anon;\\nGRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;`;
   navigator.clipboard.writeText(sql.replace(/\\n/g, '\n')).then(() => {
     alert("SQL-alustuskoodi kopioitu leikepöydälle!");
   });
@@ -1468,6 +1482,16 @@ function copySyncLink() {
   }).catch(err => {
     alert("Kopiointi epäonnistui: " + err.message);
   });
+}
+
+function deleteJob(id) {
+  if (confirm("Haluatko varmasti poistaa tämän työn (" + id + ") kokonaan? Tätä ei voi peruuttaa.")) {
+    jobs = jobs.filter(x => x.id !== id);
+    saveState();
+    dbDeleteJob(id);
+    showPage("home");
+    renderHome();
+  }
 }
 
 
