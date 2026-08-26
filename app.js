@@ -353,18 +353,28 @@ function previewIntakeImage(e) {
 
   // Assigned synchronously so a fast click on Save (before this finishes)
   // still finds a promise to await instead of saving with no photo.
+  // Wrapped in try/finally so a failure here (bad file, conversion error,
+  // read error) can never leave saveJob() waiting on this forever.
   intakeImageReading = (async () => {
-    const displayFile = await toDisplayableImage(f);
-    preview.src = URL.createObjectURL(displayFile);
-    preview.style.display = "block";
-    preview.style.maxWidth = "100%";
-    preview.style.maxHeight = "200px";
-    preview.style.borderRadius = "8px";
-    preview.style.marginTop = "8px";
-    preview.style.objectFit = "cover";
-    content.style.display = "none";
-    intakeImageBase64 = await blobToDataURL(displayFile);
-    intakeImageReading = null;
+    try {
+      const displayFile = await toDisplayableImage(f);
+      preview.src = URL.createObjectURL(displayFile);
+      preview.style.display = "block";
+      preview.style.maxWidth = "100%";
+      preview.style.maxHeight = "200px";
+      preview.style.borderRadius = "8px";
+      preview.style.marginTop = "8px";
+      preview.style.objectFit = "cover";
+      content.style.display = "none";
+      intakeImageBase64 = await blobToDataURL(displayFile);
+    } catch (err) {
+      console.error("Image preview failed:", err);
+      content.innerHTML = "⚠️ Kuvan lataus epäonnistui. Yritä valita kuva uudelleen.";
+      content.style.display = "block";
+      preview.style.display = "none";
+    } finally {
+      intakeImageReading = null;
+    }
   })();
 }
 
@@ -415,11 +425,21 @@ async function saveJob(addAnother = false){
     // A photo was just selected and is still being converted — wait for it
     // so the job isn't saved with a fallback image instead of the real one.
     // Buttons show a loading label so tapping while disabled doesn't look broken.
+    // try/finally + a timeout guarantee the buttons always come back, even if
+    // the conversion errors out or hangs (bad file, slow device, etc.).
     const saveButtons = document.querySelectorAll(".modal-actions .save");
     const originalLabels = Array.from(saveButtons).map(b => b.textContent);
     saveButtons.forEach(b => { b.disabled = true; b.textContent = "⏳ Ladataan kuvaa..."; });
-    await intakeImageReading;
-    saveButtons.forEach((b,i) => { b.disabled = false; b.textContent = originalLabels[i]; });
+    try {
+      await Promise.race([
+        intakeImageReading,
+        new Promise(resolve => setTimeout(resolve, 15000))
+      ]);
+    } catch (err) {
+      console.error("Waiting for image failed:", err);
+    } finally {
+      saveButtons.forEach((b,i) => { b.disabled = false; b.textContent = originalLabels[i]; });
+    }
   }
 
   let d=document.getElementById("date").value;
@@ -519,15 +539,20 @@ async function uploadDetailAfterImage(e, id) {
   const f = e.target.files?.[0];
   if(!f) return;
 
-  const displayFile = await toDisplayableImage(f);
-  const base64 = await blobToDataURL(displayFile);
-  const j = jobs.find(x => x.id === id);
-  if(j) {
-    j.img_after = base64;
-    saveState();
-    document.getElementById("detailAfterPreview").src = base64;
-    document.getElementById("detailAfterPreview").style.opacity = 1;
-    dbUpdateJobAfterImage(id, base64);
+  try {
+    const displayFile = await toDisplayableImage(f);
+    const base64 = await blobToDataURL(displayFile);
+    const j = jobs.find(x => x.id === id);
+    if(j) {
+      j.img_after = base64;
+      saveState();
+      document.getElementById("detailAfterPreview").src = base64;
+      document.getElementById("detailAfterPreview").style.opacity = 1;
+      dbUpdateJobAfterImage(id, base64);
+    }
+  } catch (err) {
+    console.error("After-photo upload failed:", err);
+    alert("Kuvan lataus epäonnistui. Yritä uudelleen.");
   }
 }
 
@@ -969,13 +994,19 @@ async function previewImportImage(e){
   const img=document.getElementById("importPreview");
   document.getElementById("dropContent").style.display="none";
 
-  const displayFile = await toDisplayableImage(f);
-  uploadedImageMimeType = displayFile.type;
-  img.src=URL.createObjectURL(displayFile);
-  img.style.display="block";
+  try {
+    const displayFile = await toDisplayableImage(f);
+    uploadedImageMimeType = displayFile.type;
+    img.src=URL.createObjectURL(displayFile);
+    img.style.display="block";
 
-  const dataUrl = await blobToDataURL(displayFile);
-  uploadedImageBase64 = dataUrl.split(",")[1];
+    const dataUrl = await blobToDataURL(displayFile);
+    uploadedImageBase64 = dataUrl.split(",")[1];
+  } catch (err) {
+    console.error("Import image preview failed:", err);
+    document.getElementById("dropContent").style.display="block";
+    alert("Kuvan lataus epäonnistui. Yritä uudelleen.");
+  }
 }
 
 function guessFields(text){
@@ -1430,21 +1461,28 @@ async function loadAfterImage(e) {
   const dropText = document.getElementById("afterDropText");
   dropText.style.display = "none";
 
-  const displayFile = await toDisplayableImage(f);
-  preview.src = URL.createObjectURL(displayFile);
-  preview.style.display = "block";
+  try {
+    const displayFile = await toDisplayableImage(f);
+    preview.src = URL.createObjectURL(displayFile);
+    preview.style.display = "block";
 
-  afterImageBase64 = await blobToDataURL(displayFile);
+    afterImageBase64 = await blobToDataURL(displayFile);
 
-  const select = document.getElementById("socialJobSelect");
-  const jobId = select.value;
-  if (jobId) {
-    const j = jobs.find(x => x.id === jobId);
-    if (j) {
-      j.img_after = afterImageBase64;
-      saveState();
-      dbUpdateJobAfterImage(jobId, afterImageBase64);
+    const select = document.getElementById("socialJobSelect");
+    const jobId = select.value;
+    if (jobId) {
+      const j = jobs.find(x => x.id === jobId);
+      if (j) {
+        j.img_after = afterImageBase64;
+        saveState();
+        dbUpdateJobAfterImage(jobId, afterImageBase64);
+      }
     }
+  } catch (err) {
+    console.error("After-photo load failed:", err);
+    dropText.style.display = "block";
+    preview.style.display = "none";
+    alert("Kuvan lataus epäonnistui. Yritä uudelleen.");
   }
 }
 
