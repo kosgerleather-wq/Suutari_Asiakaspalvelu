@@ -428,6 +428,17 @@
   </div>
 
   <div class="card" style="max-width: 600px; margin-top: 20px;">
+    <div class="card-title"><h2>Laitteiden synkronointi (iMac / Puhelin / Koti)</h2></div>
+    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;">
+      Käytä tätä linkkiä synkronoidaksesi tietokanta- ja AI-asetukset automaattisesti muihin laitteisiisi (esim. kotiin tai puhelimeen).
+    </p>
+    <div style="margin-top: 15px;">
+      <button class="wide-btn" onclick="copySyncLink()" style="background: var(--teal); color: white; border: 0;">Kopioi Synkronointilinkki</button>
+    </div>
+    <div id="syncStatus" style="margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--teal); display: none;"></div>
+  </div>
+
+  <div class="card" style="max-width: 600px; margin-top: 20px;">
     <div class="card-title"><h2>Google Gemini AI -yhteys</h2></div>
     <div class="form">
       <div class="field full">
@@ -595,6 +606,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260825_1747"></script>
+<script src="app.js?v=20260826_1155"></script>
 </body>
 </html>

@@ -10,6 +10,37 @@ let jobSeq=153;
 
 let supabaseClient = null;
 
+function checkSyncParam() {
+  const params = new URLSearchParams(window.location.search);
+  const syncData = params.get("sync");
+  if (syncData) {
+    try {
+      const decoded = decodeURIComponent(syncData);
+      const data = JSON.parse(atob(decoded));
+      if (data.url && data.key) {
+        localStorage.setItem("suutari_db_url", data.url);
+        localStorage.setItem("suutari_db_key", data.key);
+        if (data.geminiKey) {
+          localStorage.setItem("suutari_gemini_key", data.geminiKey);
+        }
+        if (data.aiInstructions) {
+          localStorage.setItem("suutari_ai_instructions", data.aiInstructions);
+        }
+        sessionStorage.setItem("suutari_sync_success", "true");
+      }
+    } catch (e) {
+      console.error("Sync parsing failed:", e);
+    }
+    window.location.href = window.location.origin + window.location.pathname;
+  }
+}
+checkSyncParam();
+
+if (sessionStorage.getItem("suutari_sync_success") === "true") {
+  sessionStorage.removeItem("suutari_sync_success");
+  alert("Asetukset (Supabase-tietokanta ja AI-avain) tuotu onnistuneesti tälle laitteelle!");
+}
+
 function initSupabase() {
   const url = localStorage.getItem("suutari_db_url");
   const key = localStorage.getItem("suutari_db_key");
@@ -1412,6 +1443,31 @@ async function testAISettings() {
   statusEl.textContent = `Yhteys epäonnistui: ${lastError}`;
   statusEl.style.color = "var(--red)";
   alert(`Google Gemini API Yhteysvirhe:\n\n${lastError}`);
+}
+
+function copySyncLink() {
+  const url = localStorage.getItem("suutari_db_url") || "";
+  const key = localStorage.getItem("suutari_db_key") || "";
+  const geminiKey = localStorage.getItem("suutari_gemini_key") || "";
+  const aiInstructions = localStorage.getItem("suutari_ai_instructions") || "";
+
+  if (!url || !key) {
+    alert("Määritä ja tallenna Supabase-yhteysasetukset ensin!");
+    return;
+  }
+
+  const payload = { url, key, geminiKey, aiInstructions };
+  const encoded = btoa(JSON.stringify(payload));
+  const syncLink = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(encoded)}`;
+
+  navigator.clipboard.writeText(syncLink).then(() => {
+    const statusEl = document.getElementById("syncStatus");
+    statusEl.style.display = "block";
+    statusEl.textContent = "Synkronointilinkki kopioitu leikepöydälle! Avaa tämä linkki puhelimellasi tai kotikoneellasi.";
+    alert("Synkronointilinkki kopioitu leikepöydälle!\n\nVoit nyt avata tämän linkin millä tahansa muulla laitteella synkronoidaksesi asetukset automaattisesti.");
+  }).catch(err => {
+    alert("Kopiointi epäonnistui: " + err.message);
+  });
 }
 
 
