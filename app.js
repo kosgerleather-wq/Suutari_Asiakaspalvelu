@@ -344,19 +344,25 @@ function previewIntakeImage(e) {
   const preview = document.getElementById("intakePreview");
   const content = document.getElementById("intakeDropContent");
 
-  preview.style.display = "block";
-  preview.style.maxWidth = "100%";
-  preview.style.maxHeight = "200px";
-  preview.style.borderRadius = "8px";
-  preview.style.marginTop = "8px";
-  preview.style.objectFit = "cover";
-  content.style.display = "none";
+  // Converting a HEIC photo can take a few seconds on a phone — show a
+  // loading state immediately so it's never unclear whether anything
+  // happened. The preview itself only appears once it's actually ready.
+  preview.style.display = "none";
+  content.style.display = "block";
+  content.innerHTML = "⏳ Ladataan kuvaa...";
 
   // Assigned synchronously so a fast click on Save (before this finishes)
   // still finds a promise to await instead of saving with no photo.
   intakeImageReading = (async () => {
     const displayFile = await toDisplayableImage(f);
     preview.src = URL.createObjectURL(displayFile);
+    preview.style.display = "block";
+    preview.style.maxWidth = "100%";
+    preview.style.maxHeight = "200px";
+    preview.style.borderRadius = "8px";
+    preview.style.marginTop = "8px";
+    preview.style.objectFit = "cover";
+    content.style.display = "none";
     intakeImageBase64 = await blobToDataURL(displayFile);
     intakeImageReading = null;
   })();
@@ -408,10 +414,12 @@ async function saveJob(addAnother = false){
   if (intakeImageReading) {
     // A photo was just selected and is still being converted — wait for it
     // so the job isn't saved with a fallback image instead of the real one.
+    // Buttons show a loading label so tapping while disabled doesn't look broken.
     const saveButtons = document.querySelectorAll(".modal-actions .save");
-    saveButtons.forEach(b => b.disabled = true);
+    const originalLabels = Array.from(saveButtons).map(b => b.textContent);
+    saveButtons.forEach(b => { b.disabled = true; b.textContent = "⏳ Ladataan kuvaa..."; });
     await intakeImageReading;
-    saveButtons.forEach(b => b.disabled = false);
+    saveButtons.forEach((b,i) => { b.disabled = false; b.textContent = originalLabels[i]; });
   }
 
   let d=document.getElementById("date").value;
@@ -463,9 +471,10 @@ async function saveJob(addAnother = false){
     }
     const intakeDropContent = document.getElementById("intakeDropContent");
     if (intakeDropContent) {
+      intakeDropContent.innerHTML = '📷 Ota kuva / valitse tiedosto<br><small style="font-size:11px;">Ennen-kuva suositeltava</small>';
       intakeDropContent.style.display = "block";
     }
-    
+
     // Show feedback alert in modal
     const feedback = document.createElement("div");
     feedback.style.color = "var(--teal)";
