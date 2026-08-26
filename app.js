@@ -1163,8 +1163,15 @@ CREATE TABLE IF NOT EXISTS jobs (
     img TEXT,
     img_after TEXT,
     note TEXT,
+    request_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- CREATE TABLE IF NOT EXISTS is a no-op on a table that already exists, so
+-- these guarantee any pre-existing jobs table also has every column the app
+-- writes to (running this again is always safe).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS request_id TEXT;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE requests ENABLE ROW LEVEL SECURITY;

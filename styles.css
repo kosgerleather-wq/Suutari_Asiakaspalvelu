@@ -2325,6 +2325,12 @@ main {
   font-size: 12px;
 }
 
+.social-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
 /* Responsiveness media queries */
 @media (max-width: 1080px) {
   .stats {
@@ -2333,7 +2339,7 @@ main {
   .priority-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .two-col, .detail-grid, .report-grid {
+  .two-col, .detail-grid, .report-grid, .social-layout {
     grid-template-columns: 1fr;
   }
   .customer-grid {
@@ -2408,7 +2414,8 @@ main {
     display: none;
   }
   .table-row {
-    grid-template-columns: 60px 1fr auto;
+    grid-template-columns: 60px 1fr 60px 100px;
+    gap: 10px;
     padding: 14px 16px;
   }
   .table-row > div:nth-child(3), .table-row > div:nth-child(4) {
@@ -2626,4 +2633,19 @@ img[src*="netlify"],
   pointer-events: none !important;
   height: 0 !important;
   width: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .whatsapp-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .chat-list {
+    height: 300px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .chat-window {
+    height: 450px;
+  }
 }
