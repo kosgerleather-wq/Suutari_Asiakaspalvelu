@@ -268,14 +268,15 @@ function saveRequestForm(){
 }
 
 let intakeImageBase64 = null;
+let intakeImageReading = null; // Promise that resolves once the selected photo has finished converting to base64
 
 function previewIntakeImage(e) {
   const f = e.target.files?.[0];
   if(!f) return;
-  
+
   const preview = document.getElementById("intakePreview");
   const content = document.getElementById("intakeDropContent");
-  
+
   preview.src = URL.createObjectURL(f);
   preview.style.display = "block";
   preview.style.maxWidth = "100%";
@@ -284,15 +285,20 @@ function previewIntakeImage(e) {
   preview.style.marginTop = "8px";
   preview.style.objectFit = "cover";
   content.style.display = "none";
-  
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    intakeImageBase64 = evt.target.result;
-  };
-  reader.readAsDataURL(f);
+
+  intakeImageReading = new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      intakeImageBase64 = evt.target.result;
+      intakeImageReading = null;
+      resolve();
+    };
+    reader.readAsDataURL(f);
+  });
 }
 
 function openIntake(prefill=null){
+  intakeImageReading = null;
   let initialImgStyle = "display:none;";
   let initialContentStyle = "display:block;";
   if (prefill && prefill.img) {
@@ -333,7 +339,16 @@ function openIntake(prefill=null){
   document.getElementById("modal").classList.remove("hidden");
 }
 
-function saveJob(addAnother = false){
+async function saveJob(addAnother = false){
+  if (intakeImageReading) {
+    // A photo was just selected and is still being converted — wait for it
+    // so the job isn't saved with a fallback image instead of the real one.
+    const saveButtons = document.querySelectorAll(".modal-actions .save");
+    saveButtons.forEach(b => b.disabled = true);
+    await intakeImageReading;
+    saveButtons.forEach(b => b.disabled = false);
+  }
+
   let d=document.getElementById("date").value;
   let j={
     id:"#"+(1050+jobs.length),
