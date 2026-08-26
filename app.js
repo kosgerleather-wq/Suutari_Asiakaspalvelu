@@ -462,7 +462,12 @@ function openJob(id){
 
 function openStatus(id){
   const j=jobs.find(x=>x.id===id);
-  document.getElementById("modalBody").innerHTML=`<h2>Muuta tilaa · ${j.id}</h2><p style="font-size:12px;color:#78858d">${j.name} · ${j.product}</p><div style="display:grid;gap:7px;margin-top:15px">${[["waiting","⏳ Materiaalia odotetaan"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Luovutettu"]].map(x=>`<button class="wide-btn" onclick="setStatus('${j.id}','${x[0]}')">${x[1]}</button>`).join("")}</div>`;
+  document.getElementById("modalBody").innerHTML=`<h2>Muuta tilaa · ${j.id}</h2><p style="font-size:12px;color:#78858d">${j.name} · ${j.product}</p>
+<div style="display:grid;gap:7px;margin-top:15px">
+  ${[["waiting","⏳ Materiaalia odotetaan"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Luovutettu"]].map(x=>`<button class="wide-btn" onclick="setStatus('${j.id}','${x[0]}')">${x[1]}</button>`).join("")}
+  <hr style="border:0;border-top:1px solid var(--border);margin:10px 0">
+  <button class="wide-btn" style="background:#ef4444;color:white;font-weight:600;" onclick="closeModal();deleteJob('${j.id}');">🗑️ POISTA TÄMÄ TYÖ</button>
+</div>`;
   document.getElementById("modal").classList.remove("hidden");
 }
 
