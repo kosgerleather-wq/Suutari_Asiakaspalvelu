@@ -65,7 +65,7 @@
   </div>
   <nav>
     <button class="active" data-page="home">⌂ <span>Tänään</span></button>
-    <button data-page="inbox">◉ <span>Viestit</span><em>3</em></button>
+    <button data-page="inbox">◉ <span>Viestit</span><em id="inboxBadge">0</em></button>
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
     <button data-page="shelves">◰ <span>Hyllykartta</span></button>
@@ -100,11 +100,11 @@
   </div>
   
   <div class="stats">
-    <div class="stat red"><small>Toimenpiteitä tarvitaan</small><strong>3</strong><span>Tänään</span></div>
-    <div class="stat orange"><small>Toimitus tänään</small><strong>4</strong><span>2 tunnin sisällä</span></div>
-    <div class="stat blue"><small>Verstaalla</small><strong>12</strong><span>Työn alla</span></div>
-    <div class="stat teal"><small>Valmis</small><strong>3</strong><span>Asiakasta odotetaan</span></div>
-    <div class="stat purple"><small>Uusi viesti</small><strong>3</strong><span>WhatsApp</span></div>
+    <div class="stat red"><small>Toimenpiteitä tarvitaan</small><strong id="statActionsNeeded">0</strong><span>Tänään</span></div>
+    <div class="stat orange"><small>Toimitus tänään</small><strong id="statDueToday">0</strong><span>2 tunnin sisällä</span></div>
+    <div class="stat blue"><small>Verstaalla</small><strong id="statInProgress">0</strong><span>Työn alla</span></div>
+    <div class="stat teal"><small>Valmis</small><strong id="statReady">0</strong><span>Asiakasta odotetaan</span></div>
+    <div class="stat purple"><small>Uusi viesti</small><strong id="statNewMsg">0</strong><span>WhatsApp</span></div>
   </div>
 
   <div class="section-title">
@@ -115,16 +115,16 @@
 
   <div class="two-col">
     <div class="card">
-      <div class="card-title"><h2>📦 Toimitus tänään</h2><span>4 työtä</span></div>
+      <div class="card-title"><h2>📦 Toimitus tänään</h2><span id="todayCount">0 työtä</span></div>
       <div id="today"></div>
     </div>
     <div class="card">
       <div class="card-title"><h2>💬 WhatsApp</h2><button onclick="showPage('inbox')">Avaa →</button></div>
       <div class="message-summary">
-        <div class="big-number">3</div>
+        <div class="big-number" id="waBigNumber">0</div>
         <div>
           <b>uutta asiakaskyselyä</b>
-          <p>2 asiakasta tuo tuotteen pian verstaalle.</p>
+          <p id="waBringText">0 asiakasta tuo tuotteen pian verstaalle.</p>
         </div>
       </div>
       <button class="wide-btn" onclick="showPage('inbox')">Seuraa viestejä</button>
@@ -146,11 +146,11 @@
   </div>
   
   <div class="pipeline">
-    <span class="on">Uusi <b>3</b></span>
-    <span>Vastattu <b>2</b></span>
-    <span>Asiakas tuo <b>2</b></span>
-    <span>Tuote saapui <b>1</b></span>
-    <span>Työn alla <b>5</b></span>
+    <span class="on">Uusi <b id="pipelineNew">0</b></span>
+    <span>Vastattu <b id="pipelineAnswered">0</b></span>
+    <span>Asiakas tuo <b id="pipelineBring">0</b></span>
+    <span>Tuote saapui <b id="pipelineArrived">0</b></span>
+    <span>Työn alla <b id="pipelineConverted">0</b></span>
   </div>
   
   <div class="whatsapp-shell">
@@ -651,6 +651,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260826_2000"></script>
+<script src="app.js?v=20260826_2300"></script>
 </body>
 </html>

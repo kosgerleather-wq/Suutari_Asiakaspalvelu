@@ -64,6 +64,41 @@ function saveState(){
   localStorage.setItem("suutari_jobs",JSON.stringify(jobs));
   localStorage.setItem("suutari_requests",JSON.stringify(requests));
   localStorage.setItem("suutari_seqs",JSON.stringify({requestSeq,customerSeq,jobSeq,jobIdSeq}));
+  updateBadges();
+}
+
+function todayDateStr(){
+  const d=new Date();
+  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+}
+
+function updateBadges(){
+  const newRequests = requests.filter(r=>r.status==="new").length;
+  const answeredRequests = requests.filter(r=>r.status==="answered").length;
+  const bringRequests = requests.filter(r=>r.status==="bring").length;
+  const arrivedRequests = requests.filter(r=>r.status==="arrived").length;
+  const convertedRequests = requests.filter(r=>r.status==="converted").length;
+  const lateJobs = jobs.filter(j=>j.status==="late").length;
+  const activeJobs = jobs.filter(j=>j.status==="active").length;
+  const readyJobs = jobs.filter(j=>j.status==="ready").length;
+  const dueTodayJobs = jobs.filter(j=>j.date===todayDateStr()).length;
+  const todayListCount = Math.min(jobs.length, 4);
+
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+  set("inboxBadge", newRequests);
+  set("statActionsNeeded", lateJobs + newRequests);
+  set("statDueToday", dueTodayJobs);
+  set("statInProgress", activeJobs);
+  set("statReady", readyJobs);
+  set("statNewMsg", newRequests);
+  set("todayCount", `${todayListCount} työtä`);
+  set("waBigNumber", newRequests);
+  set("waBringText", `${bringRequests} asiakasta tuo tuotteen pian verstaalle.`);
+  set("pipelineNew", newRequests);
+  set("pipelineAnswered", answeredRequests);
+  set("pipelineBring", bringRequests);
+  set("pipelineArrived", arrivedRequests);
+  set("pipelineConverted", convertedRequests);
 }
 
 async function dbInsertJob(j) {
@@ -224,6 +259,7 @@ function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><
 function renderHome(){
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${j.status==='late'?'MYÖHÄSSÄ':j.status==='waiting'?'ODOTTAA':'AKTIIVINEN'}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   document.getElementById("today").innerHTML=jobs.slice(0,4).map(jobLine).join("");
+  updateBadges();
 }
 
 function renderInbox(){
