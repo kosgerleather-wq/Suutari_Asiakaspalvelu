@@ -11,11 +11,13 @@ let jobSeq=153;
 let supabaseClient = null;
 
 function checkSyncParam() {
-  const params = new URLSearchParams(window.location.search);
-  const syncData = params.get("sync");
-  if (syncData) {
+  // Uses the URL fragment (#), not a query string, so this never gets sent to
+  // the server/CDN access logs — only readable client-side.
+  const hash = window.location.hash;
+  if (hash && hash.startsWith("#sync=")) {
     try {
-      const decoded = decodeURIComponent(syncData);
+      const encoded = hash.slice("#sync=".length);
+      const decoded = decodeURIComponent(encoded);
       const data = JSON.parse(atob(decoded));
       if (data.url && data.key) {
         localStorage.setItem("suutari_db_url", data.url);
@@ -31,7 +33,7 @@ function checkSyncParam() {
     } catch (e) {
       console.error("Sync parsing failed:", e);
     }
-    window.location.href = window.location.origin + window.location.pathname;
+    window.location.replace(window.location.origin + window.location.pathname);
   }
 }
 checkSyncParam();
@@ -212,8 +214,8 @@ function showPage(id){
     document.getElementById("aiStatus").style.display = "none";
     document.getElementById("aiInstructions").value = localStorage.getItem("suutari_ai_instructions") || "";
     document.getElementById("aiInstructionsStatus").style.display = "none";
-    document.getElementById("settingsUser").value = localStorage.getItem("suutari_admin_user") || "suutari";
-    document.getElementById("settingsPass").value = "";
+    document.getElementById("currentUserEmail").textContent = currentUser?.email || "—";
+    document.getElementById("newPassword").value = "";
     document.getElementById("authSettingsStatus").style.display = "none";
   }
 }
@@ -593,8 +595,178 @@ function renderCustomers(){
 function closeModal(){document.getElementById("modal").classList.add("hidden")}
 document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
 
-// Initialize Data and UI
-initData();
+// Initialize Data and UI (gated behind a real Supabase Auth session — see checkAuth())
+let currentUser = null;
+checkAuth();
+
+function showLoginScreen(errorMsg) {
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("loginInfo").style.display = "none";
+  const errEl = document.getElementById("loginError");
+  if (errorMsg) {
+    errEl.textContent = errorMsg;
+    errEl.style.display = "block";
+  } else {
+    errEl.style.display = "none";
+  }
+}
+
+function hideLoginScreen() {
+  document.getElementById("loginScreen").style.display = "none";
+}
+
+function showRecoveryScreen() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("recoveryScreen").style.display = "flex";
+}
+
+function hideRecoveryScreen() {
+  document.getElementById("recoveryScreen").style.display = "none";
+}
+
+async function checkAuth() {
+  if (!initSupabase()) {
+    // Supabase SDK not loaded (offline?) — nothing to authenticate against.
+    showLoginScreen("Ei yhteyttä tietokantaan. Tarkista verkkoyhteys.");
+    return;
+  }
+
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") {
+      currentUser = null;
+      jobs = [];
+      requests = [];
+      showLoginScreen();
+    }
+    if (event === "PASSWORD_RECOVERY") {
+      // User clicked the reset-password link from their email.
+      showRecoveryScreen();
+    }
+  });
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    hideLoginScreen();
+    await initData();
+    renderHome();
+  } else {
+    showLoginScreen();
+  }
+}
+
+async function login() {
+  const email = document.getElementById("loginUser").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  const btn = document.getElementById("loginBtn");
+  if (!email || !pass) {
+    showLoginScreen("Anna sähköposti ja salasana.");
+    return;
+  }
+  if (!supabaseClient) initSupabase();
+
+  btn.disabled = true;
+  btn.textContent = "Kirjaudutaan...";
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false;
+  btn.textContent = "Kirjaudu";
+
+  if (error) {
+    showLoginScreen("Virheellinen sähköposti tai salasana.");
+    return;
+  }
+
+  currentUser = data.user;
+  document.getElementById("loginUser").value = "";
+  document.getElementById("loginPass").value = "";
+  hideLoginScreen();
+  await initData();
+  renderHome();
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  jobs = [];
+  requests = [];
+  showLoginScreen();
+}
+
+async function sendPasswordReset() {
+  const email = document.getElementById("loginUser").value.trim();
+  const infoEl = document.getElementById("loginInfo");
+  const errEl = document.getElementById("loginError");
+  errEl.style.display = "none";
+
+  if (!email) {
+    errEl.textContent = "Kirjoita ensin sähköpostiosoitteesi yllä olevaan kenttään.";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!supabaseClient) initSupabase();
+
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+
+  // Always show the same message, whether or not the address exists,
+  // so this can't be used to check which emails are registered.
+  infoEl.textContent = "Jos tili on olemassa, salasanan palautuslinkki on lähetetty sähköpostiisi.";
+  infoEl.style.display = "block";
+  if (error) console.error("Password reset request failed:", error.message);
+}
+
+async function submitNewPassword() {
+  const pass = document.getElementById("recoveryPass").value;
+  const btn = document.getElementById("recoveryBtn");
+  const errEl = document.getElementById("recoveryError");
+  errEl.style.display = "none";
+
+  if (!pass || pass.length < 6) {
+    errEl.textContent = "Salasanan tulee olla vähintään 6 merkkiä.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Tallennetaan...";
+  const { error } = await supabaseClient.auth.updateUser({ password: pass });
+  btn.disabled = false;
+  btn.textContent = "Tallenna salasana";
+
+  if (error) {
+    errEl.textContent = "Salasanan tallennus epäonnistui: " + error.message;
+    errEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("recoveryPass").value = "";
+  hideRecoveryScreen();
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  currentUser = session?.user || null;
+  await initData();
+  renderHome();
+}
+
+async function changePassword() {
+  const pass = document.getElementById("newPassword").value;
+  const statusEl = document.getElementById("authSettingsStatus");
+  statusEl.style.display = "block";
+  if (!pass || pass.length < 6) {
+    statusEl.textContent = "Salasanan tulee olla vähintään 6 merkkiä.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const { error } = await supabaseClient.auth.updateUser({ password: pass });
+  if (error) {
+    statusEl.textContent = "Salasanan vaihto epäonnistui: " + error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  document.getElementById("newPassword").value = "";
+  statusEl.textContent = "Salasana vaihdettu onnistuneesti!";
+  statusEl.style.color = "var(--teal)";
+}
 
 /* V5: workshop-specific inbox override */
 let waFilter="all";
@@ -904,8 +1076,81 @@ async function testConnection() {
 }
 
 function copySQLSetup() {
-  const sql = `-- Create requests table\\nCREATE TABLE IF NOT EXISTS requests (\\n    id BIGINT PRIMARY KEY,\\n    name TEXT,\\n    product TEXT,\\n    work TEXT,\\n    status TEXT,\\n    img TEXT,\\n    msg TEXT,\\n    reply TEXT,\\n    source TEXT,\\n    request_id TEXT UNIQUE,\\n    customer_id TEXT,\\n    created_at TEXT,\\n    price TEXT,\\n    job_id TEXT\\n);\\n\\n-- Create jobs table\\nCREATE TABLE IF NOT EXISTS jobs (\\n    id TEXT PRIMARY KEY,\\n    name TEXT,\\n    phone TEXT,\\n    product TEXT,\\n    work TEXT,\\n    price NUMERIC,\\n    date TEXT,\\n    status TEXT,\\n    loc TEXT,\\n    img TEXT,\\n    img_after TEXT,\\n    note TEXT,\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\\n);\\n\\n-- Enable Row Level Security (RLS)\\nALTER TABLE requests ENABLE ROW LEVEL SECURITY;\\nALTER TABLE jobs ENABLE ROW LEVEL SECURITY;\\n\\n-- Create policies for public access\\nCREATE POLICY "Allow public read" ON requests FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON requests FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON requests FOR UPDATE USING (true);\\nCREATE POLICY "Allow public delete" ON requests FOR DELETE USING (true);\\n\\nCREATE POLICY "Allow public read" ON jobs FOR SELECT USING (true);\\nCREATE POLICY "Allow public insert" ON jobs FOR INSERT WITH CHECK (true);\\nCREATE POLICY "Allow public update" ON jobs FOR UPDATE USING (true);\\nCREATE POLICY "Allow public delete" ON jobs FOR DELETE USING (true);\\n\\n-- SECURITY UPDATE: Secure lookup function for customers (hides phone and names)\\nCREATE OR REPLACE FUNCTION get_job_status(job_id TEXT)\\nRETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT) AS $$\\nBEGIN\\n  RETURN QUERY\\n  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after\\n  FROM jobs j\\n  WHERE j.id = job_id;\\nEND;\\n$$ LANGUAGE plpgsql SECURITY DEFINER;\\n\\n-- Grant execute permissions\\nGRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO anon;\\nGRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;`;
-  navigator.clipboard.writeText(sql.replace(/\\n/g, '\n')).then(() => {
+  // Locked-down version: table access requires a real Supabase Auth session
+  // (role = authenticated). Anonymous visitors can only call get_job_status()
+  // for order tracking — they get no direct table access at all.
+  const sql = `-- Create requests table
+CREATE TABLE IF NOT EXISTS requests (
+    id BIGINT PRIMARY KEY,
+    name TEXT,
+    product TEXT,
+    work TEXT,
+    status TEXT,
+    img TEXT,
+    msg TEXT,
+    reply TEXT,
+    source TEXT,
+    request_id TEXT UNIQUE,
+    customer_id TEXT,
+    created_at TEXT,
+    price TEXT,
+    job_id TEXT
+);
+
+-- Create jobs table
+CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    phone TEXT,
+    product TEXT,
+    work TEXT,
+    price NUMERIC,
+    date TEXT,
+    status TEXT,
+    loc TEXT,
+    img TEXT,
+    img_after TEXT,
+    note TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+
+-- Remove any old wide-open public policies (safe if they don't exist)
+DROP POLICY IF EXISTS "Allow public read" ON requests;
+DROP POLICY IF EXISTS "Allow public insert" ON requests;
+DROP POLICY IF EXISTS "Allow public update" ON requests;
+DROP POLICY IF EXISTS "Allow public delete" ON requests;
+DROP POLICY IF EXISTS "Allow public read" ON jobs;
+DROP POLICY IF EXISTS "Allow public insert" ON jobs;
+DROP POLICY IF EXISTS "Allow public update" ON jobs;
+DROP POLICY IF EXISTS "Allow public delete" ON jobs;
+DROP POLICY IF EXISTS "Authenticated full access" ON requests;
+DROP POLICY IF EXISTS "Authenticated full access" ON jobs;
+
+-- Only logged-in staff (Supabase Auth) may read/write these tables
+CREATE POLICY "Authenticated full access" ON requests
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated full access" ON jobs
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- Secure lookup function for customer order tracking (hides phone and names)
+CREATE OR REPLACE FUNCTION get_job_status(job_id TEXT)
+RETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after
+  FROM jobs j
+  WHERE j.id = job_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Only this narrow function is public; the tables themselves are not
+GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;`;
+  navigator.clipboard.writeText(sql).then(() => {
     alert("SQL-alustuskoodi kopioitu leikepöydälle!");
   });
 }
@@ -1502,13 +1747,14 @@ function copySyncLink() {
 
   const payload = { url, key, geminiKey, aiInstructions };
   const encoded = btoa(JSON.stringify(payload));
-  const syncLink = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(encoded)}`;
+  // URL fragment (#), not a query string — never sent to the server/CDN logs.
+  const syncLink = `${window.location.origin}${window.location.pathname}#sync=${encodeURIComponent(encoded)}`;
 
   navigator.clipboard.writeText(syncLink).then(() => {
     const statusEl = document.getElementById("syncStatus");
     statusEl.style.display = "block";
     statusEl.textContent = "Synkronointilinkki kopioitu leikepöydälle! Avaa tämä linkki puhelimellasi tai kotikoneellasi.";
-    alert("Synkronointilinkki kopioitu leikepöydälle!\n\nVoit nyt avata tämän linkin millä tahansa muulla laitteella synkronoidaksesi asetukset automaattisesti.");
+    alert("Synkronointilinkki kopioitu leikepöydälle!\n\nVoit nyt avata tämän linkin millä tahansa muulla laitteella synkronoidaksesi asetukset automaattisesti. Huom: linkki paljastaa tietokantayhteytesi jos joku muu sen näkee, joten lähetä se vain luotetulla kanavalla. Kirjautuminen vaaditaan silti erikseen uudella laitteella.");
   }).catch(err => {
     alert("Kopiointi epäonnistui: " + err.message);
   });
