@@ -1,6 +1,4 @@
 const bag="https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=500&q=80";
-const shoe="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80";
-const boot="https://images.unsplash.com/photo-1608256246200-53e635b5b65f?auto=format&fit=crop&w=500&q=80";
 
 let jobs=[];
 let requests=[];
@@ -142,12 +140,8 @@ async function syncFromDb() {
     const { data: reqData, error: reqErr } = await supabaseClient.from("requests").select("*");
     if(reqErr) throw reqErr;
 
-    if(jobData && jobData.length > 0) {
-      jobs = jobData;
-    }
-    if(reqData && reqData.length > 0) {
-      requests = reqData;
-    }
+    jobs = jobData || [];
+    requests = reqData || [];
     saveState();
     return true;
   } catch(err) {
@@ -171,21 +165,8 @@ async function initData(){
       jobIdSeq=seqs.jobIdSeq||1053;
     }
   }else{
-    jobs=[
-      {id:"#1052",name:"Anna Virtanen",product:"Marimekko käsilaukku",work:"Vetoketjun vaihto",price:45,date:"28.08.2026",status:"active",loc:"A3-07",img:bag,note:"Musta vetoketju. Asiakas hyväksyi hinta-arvion."},
-      {id:"#1042",name:"Liisa Korhonen",product:"Nahkalaukku",work:"Kahvan korjaus",price:55,date:"21.08.2026",status:"late",loc:"A2-03",img:bag,note:"Kahva vaatii vahvistuksen."},
-      {id:"#1046",name:"Matti Laine",product:"Nahkakenkä",work:"Pohjallisen vaihto",price:35,date:"27.08.2026",status:"waiting",loc:"B1-04",img:shoe,note:"Materiaali saapuu tiistaina."},
-      {id:"#1047",name:"Sara Niemi",product:"Saapas",work:"Vetoketju",price:40,date:"30.08.2026",status:"active",loc:"C2-01",img:boot,note:"Uusi vetoketju tilattu."},
-      {id:"#1048",name:"Jukka Virtanen",product:"Nahkatakki",work:"Vetoketjun vaihto",price:60,date:"30.08.2026",status:"ready",loc:"B3-02",img:bag,note:"Valmis, asiakas viestitetty."}
-    ];
-    requests=[
-      {id:1,name:"Anna Virtanen",product:"Marimekko käsilaukku",work:"Vetoketjun vaihto",status:"answered",img:bag,msg:"Voisitteko korjata tämän laukun vetoketjun?",reply:"Arvio noin 45 €."},
-      {id:2,name:"Sara Niemi",product:"Laukku",work:"Vetoketjun korjaus",status:"bring",img:bag,msg:"Tuon laukun huomenna.",reply:"Sopii hyvin, tervetuloa! 😊"},
-      {id:3,name:"Laura K.",product:"Saapas",work:"Vetoketju",status:"new",img:boot,msg:"Onko mahdollista korjata tämän saappaan vetoketju?",reply:""},
-      {id:4,name:"Pekka T.",product:"Nahkatakki",work:"Vetoketjun vaihto",status:"new",img:bag,msg:"Paljonko uuden vetoketjun vaihto maksaa?",reply:""},
-      {id:5,name:"Camilla R.",product:"Lompakko",work:"Vetoketju",status:"arrived",img:bag,msg:"Tuotu tänään.",reply:""}
-    ];
-    addDemoSources();
+    jobs=[];
+    requests=[];
   }
 
   // Automatically determine next jobIdSeq based on max job ID in the list
@@ -1038,7 +1019,6 @@ function makeRequestId(source){requestSeq[source]=(requestSeq[source]||0)+1;retu
 function makeCustomerId(){customerSeq++;return `C-2026-${String(customerSeq).padStart(6,"0")}`}
 function makeJobId(){jobSeq++;return `J-2026-${String(jobSeq).padStart(6,"0")}`}
 function normalizeRequests(){requests.forEach(r=>{r.source=r.source||"whatsapp";r.request_id=r.request_id||makeRequestId(r.source);r.customer_id=r.customer_id||makeCustomerId();r.created_at=r.created_at||"2026-08-24";if(r.status==="converted"&&!r.job_id)r.job_id=makeJobId();if(r.price===undefined)r.price=""})}
-function addDemoSources(){let b=requests[0]||{name:"Anna Virtanen",product:"Käsilaukku",work:"Vetoketjun korjaus",msg:"Hei!",status:"new"};let d=[{...b,id:90001,name:"Mikko Laine",product:"Kengät",work:"Pohjan korjaus",msg:"Voitteko korjata pohjan?",status:"converted",source:"store",request_id:"S-2026-000146",customer_id:"C-2026-000422",created_at:"2026-08-22",job_id:"J-2026-00153",price:75},{...b,id:90002,name:"Sara Niemi",product:"Laukku",work:"Sauman korjaus",msg:"Paljonko maksaa?",status:"answered",source:"email",request_id:"E-2026-000033",customer_id:"C-2026-000423",created_at:"2026-08-23",price:""},{...b,id:90003,name:"John Smith",product:"Nahkatakki",work:"Vetoketjun vaihto",msg:"Lähetän takin postissa.",status:"bring",source:"post",request_id:"P-2026-000020",customer_id:"C-2026-000424",created_at:"2026-08-24",price:90}];d.forEach(x=>{if(!requests.some(r=>r.request_id===x.request_id))requests.push(x)});normalizeRequests();saveState();}
 function getExportData(){let f=document.getElementById("exportFrom")?.value||"",t=document.getElementById("exportTo")?.value||"",s=document.getElementById("exportSource")?.value||"all",st=document.getElementById("exportStatus")?.value||"all";return requests.filter(r=>(!f||(r.created_at||"")>=f)&&(!t||(r.created_at||"")<=t)&&(s==="all"||r.source===s)&&(st==="all"||r.status===st))}
 
 function renderReports(){
