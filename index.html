@@ -99,6 +99,19 @@
     <button class="quick-add" onclick="openIntake()">＋ <span>UUSI VASTAANOTTO</span></button>
   </div>
   
+  <!-- Morning Brief (Päivän Briiffi) -->
+  <div id="morningBrief" class="card" style="display:none; margin-bottom: 25px; border-left: 5px solid var(--teal); background: linear-gradient(135deg, rgba(19, 140, 140, 0.05) 0%, rgba(15, 45, 74, 0.02) 100%); padding: 20px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div style="text-align:left; width:100%;">
+        <span class="eyebrow" style="color:var(--teal); font-weight:700;">💡 PÄIVÄN BRIEFFI (SABAH ÖZETİ)</span>
+        <h3 style="margin:5px 0 8px; font-size:16px; color:var(--primary); font-family:var(--font-heading);" id="briefGreeting">Hei! Tässä ovat tärkeimmät huomiot tälle päivälle:</h3>
+        <ul id="briefList" style="margin:5px 0 0; padding-left:18px; font-size:13px; color:var(--text-main); line-height:1.7;">
+        </ul>
+      </div>
+      <button onclick="dismissBrief()" style="background:none; border:0; color:var(--text-muted); font-size:20px; cursor:pointer; padding:2px 8px; margin-top:-5px; font-weight:bold;">×</button>
+    </div>
+  </div>
+
   <div class="stats">
     <div class="stat red"><small>Toimenpiteitä tarvitaan</small><strong id="statActionsNeeded">0</strong><span>Tänään</span></div>
     <div class="stat orange"><small>Toimitus tänään</small><strong id="statDueToday">0</strong><span>2 tunnin sisällä</span></div>
@@ -118,16 +131,32 @@
       <div class="card-title"><h2>📦 Toimitus tänään</h2><span id="todayCount">0 työtä</span></div>
       <div id="today"></div>
     </div>
-    <div class="card">
-      <div class="card-title"><h2>💬 WhatsApp</h2><button onclick="showPage('inbox')">Avaa →</button></div>
-      <div class="message-summary">
-        <div class="big-number" id="waBigNumber">0</div>
-        <div>
-          <b>uutta asiakaskyselyä</b>
-          <p id="waBringText">0 asiakasta tuo tuotteen pian verstaalle.</p>
+    <div style="display:flex; flex-direction:column; gap:20px;">
+      <div class="card">
+        <div class="card-title"><h2>💬 WhatsApp</h2><button onclick="showPage('inbox')">Avaa →</button></div>
+        <div class="message-summary">
+          <div class="big-number" id="waBigNumber">0</div>
+          <div>
+            <b>uutta asiakaskyselyä</b>
+            <p id="waBringText">0 asiakasta tuo tuotteen pian verstaalle.</p>
+          </div>
+        </div>
+        <button class="wide-btn" onclick="showPage('inbox')">Seuraa viestejä</button>
+      </div>
+      
+      <!-- Tehtävälista (Muistilista) -->
+      <div class="card">
+        <div class="card-title">
+          <h2>📝 Tehtävälista (Muistilista)</h2>
+          <span id="todoCount" style="font-size:11px; color:var(--text-muted); font-weight:600;">0 active</span>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:15px;">
+          <input type="text" id="todoInput" placeholder="Esim: A3-07 liimaus, boya siparişi..." style="flex:1; padding:10px; border-radius:8px; border:1px solid var(--border-color); font-size:12px; outline:none; font-family:inherit; background:var(--bg-main);" onkeydown="if(event.key==='Enter')addTodoTask()">
+          <button onclick="addTodoTask()" style="padding:10px 14px; background:var(--primary); color:white; border:0; border-radius:8px; font-weight:700; cursor:pointer; font-size:13px; font-family:inherit;">＋</button>
+        </div>
+        <div id="todoList" style="display:grid; gap:8px; max-height:220px; overflow:auto; padding-right:4px;">
         </div>
       </div>
-      <button class="wide-btn" onclick="showPage('inbox')">Seuraa viestejä</button>
     </div>
   </div>
 </section>
@@ -652,6 +681,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-<script src="app.js?v=20260827_0000"></script>
+<script src="app.js?v=20260827_0100"></script>
 </body>
 </html>

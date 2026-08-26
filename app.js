@@ -31,6 +31,7 @@ let customerSeq=421;
 let jobSeq=153;
 let jobIdSeq=1053;
 let activeConvertingRequestId=null;
+let todos=[];
 
 let supabaseClient = null;
 
@@ -88,6 +89,7 @@ function saveState(){
   localStorage.setItem("suutari_jobs",JSON.stringify(jobs));
   localStorage.setItem("suutari_requests",JSON.stringify(requests));
   localStorage.setItem("suutari_seqs",JSON.stringify({requestSeq,customerSeq,jobSeq,jobIdSeq}));
+  localStorage.setItem("suutari_todos",JSON.stringify(todos));
   updateBadges();
 }
 
@@ -123,6 +125,7 @@ function updateBadges(){
   set("pipelineBring", bringRequests);
   set("pipelineArrived", arrivedRequests);
   set("pipelineConverted", convertedRequests);
+  renderMorningBrief();
 }
 
 async function dbInsertJob(j) {
@@ -228,6 +231,9 @@ async function initData(){
     requests=[];
   }
 
+  const storedTodos = localStorage.getItem("suutari_todos");
+  todos = storedTodos ? JSON.parse(storedTodos) : [];
+
   // Automatically determine next jobIdSeq based on max job ID in the list
   if (jobs && jobs.length > 0) {
     let maxId = 1052;
@@ -283,6 +289,8 @@ function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><
 function renderHome(){
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${j.status==='late'?'MYÖHÄSSÄ':j.status==='waiting'?'ODOTTAA':'AKTIIVINEN'}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   document.getElementById("today").innerHTML=jobs.slice(0,4).map(jobLine).join("");
+  renderMorningBrief();
+  renderTodos();
   updateBadges();
 }
 
@@ -1868,6 +1876,129 @@ function deleteRequest(id) {
     dbDeleteRequest(id);
     renderWhatsappV5();
   }
+}
+
+/* Morning Brief (Sabah Özeti) helper functions */
+function renderMorningBrief() {
+  const briefList = document.getElementById("briefList");
+  const briefCard = document.getElementById("morningBrief");
+  if (!briefList || !briefCard) return;
+
+  if (sessionStorage.getItem("suutari_brief_dismissed") === "true") {
+    briefCard.style.display = "none";
+    return;
+  }
+
+  const items = [];
+  const todayStr = todayDateStr();
+
+  // 1. Myöhässä olevat (Late jobs)
+  const lateJobsList = jobs.filter(j => j.status === "late");
+  if (lateJobsList.length > 0) {
+    items.push(`🔴 <strong>${lateJobsList.length} työtä on myöhässä!</strong> Suosittelemme saattamaan nämä nopeasti valmiiksi.`);
+  }
+
+  // 2. Tänään toimitettavat (Due today)
+  const dueTodayList = jobs.filter(j => j.date === todayStr && j.status !== "done" && j.status !== "ready");
+  if (dueTodayList.length > 0) {
+    items.push(`📅 <strong>${dueTodayList.length} työ(tä) tulee luovuttaa tänään.</strong> Varmista, että nämä ovat valmiina.`);
+  }
+
+  // 3. Riskiryhmä: Malzeme bekleyen acil işler (Waiting for material due within 2 days)
+  const now = new Date();
+  const riskJobs = jobs.filter(j => {
+    if (j.status !== "waiting") return false;
+    try {
+      const parts = j.date.split(".");
+      if (parts.length === 3) {
+        const dueDate = new Date(parts[2], parts[1] - 1, parts[0]);
+        const diffTime = dueDate - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 2;
+      }
+    } catch(e) {}
+    return false;
+  });
+  if (riskJobs.length > 0) {
+    items.push(`⚠️ <strong>${riskJobs.length} työ(tä) odottaa materiaaleja, vaikka toimitusaika on alle 48 tunnin päästä!</strong>`);
+  }
+
+  // 4. WhatsApp uudet viestit (New WhatsApp inquiries)
+  const newRequestsCount = requests.filter(r => r.source === "whatsapp" && r.status === "new").length;
+  if (newRequestsCount > 0) {
+    items.push(`💬 <strong>${newRequestsCount} uutta WhatsApp-kyselyä odottaa vastaustasi.</strong>`);
+  }
+
+  if (items.length > 0) {
+    briefList.innerHTML = items.map(item => `<li>${item}</li>`).join("");
+    briefCard.style.display = "block";
+  } else {
+    briefList.innerHTML = `<li>✨ Kaikki ajallaan! Ei kiireellisiä huomioita tälle päivälle. Hyvää työpäivää!</li>`;
+    briefCard.style.display = "block";
+  }
+}
+
+function dismissBrief() {
+  sessionStorage.setItem("suutari_brief_dismissed", "true");
+  const briefCard = document.getElementById("morningBrief");
+  if (briefCard) briefCard.style.display = "none";
+}
+
+/* Tehtävälista (Muistilista) helper functions */
+function renderTodos() {
+  const listEl = document.getElementById("todoList");
+  const countEl = document.getElementById("todoCount");
+  if (!listEl || !countEl) return;
+
+  const activeCount = todos.filter(t => !t.done).length;
+  countEl.textContent = `${activeCount} active`;
+
+  if (todos.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px 0;">Ei tehtäviä. Lisää ensimmäinen ylhäältä!</div>`;
+    return;
+  }
+
+  listEl.innerHTML = todos.map(t => `
+    <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-main); padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); opacity: ${t.done ? 0.6 : 1}; transition: opacity 0.2s;">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; text-decoration: ${t.done ? 'line-through' : 'none'}; color: ${t.done ? 'var(--text-muted)' : 'var(--text-main)'}; width:80%;">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodoTask(${t.id})" style="width:16px; height:16px; cursor:pointer;">
+        <span>${t.text}</span>
+      </label>
+      <button onclick="deleteTodoTask(${t.id})" style="background:none; border:0; color:#ef4444; font-size:14px; cursor:pointer; padding:4px 8px; display:flex; align-items:center; justify-content:center;">🗑️</button>
+    </div>
+  `).join("");
+}
+
+function addTodoTask() {
+  const input = document.getElementById("todoInput");
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) return;
+
+  todos.push({
+    id: Date.now(),
+    text: val,
+    done: false
+  });
+
+  input.value = "";
+  saveState();
+  renderTodos();
+}
+
+function toggleTodoTask(id) {
+  const t = todos.find(x => x.id === id);
+  if (t) {
+    t.done = !t.done;
+    saveState();
+    renderTodos();
+  }
+}
+
+function deleteTodoTask(id) {
+  todos = todos.filter(x => x.id !== id);
+  saveState();
+  renderTodos();
 }
 
 
