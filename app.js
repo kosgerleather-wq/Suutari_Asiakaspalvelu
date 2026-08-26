@@ -42,8 +42,15 @@ if (sessionStorage.getItem("suutari_sync_success") === "true") {
 }
 
 function initSupabase() {
-  const url = localStorage.getItem("suutari_db_url");
-  const key = localStorage.getItem("suutari_db_key");
+  const defaultUrl = "https://yjcpygwcbhmxtuqwvzkj.supabase.co";
+  const defaultKey = "sb_publishable_tBL_fxc91edlgH7WphAxbw_5ZVA1pje";
+  
+  const url = localStorage.getItem("suutari_db_url") || defaultUrl;
+  const key = localStorage.getItem("suutari_db_key") || defaultKey;
+  
+  if (!localStorage.getItem("suutari_db_url")) localStorage.setItem("suutari_db_url", defaultUrl);
+  if (!localStorage.getItem("suutari_db_key")) localStorage.setItem("suutari_db_key", defaultKey);
+  
   if(url && key && typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(url, key);
     return true;
