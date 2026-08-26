@@ -1,5 +1,29 @@
 const bag="https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=500&q=80";
 
+// iPhones save camera photos as HEIC by default, which no browser except
+// Safari can decode into <img> — they show as blank. Convert to JPEG first
+// so uploaded photos always actually render.
+async function toDisplayableImage(file) {
+  const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name || "");
+  if (!isHeic || typeof heic2any === "undefined") return file;
+  try {
+    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+    return Array.isArray(converted) ? converted[0] : converted;
+  } catch (err) {
+    console.error("HEIC conversion failed:", err);
+    return file;
+  }
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 let jobs=[];
 let requests=[];
 let requestSeq={store:146,whatsapp:87,email:33,post:20};
@@ -312,7 +336,6 @@ function previewIntakeImage(e) {
   const preview = document.getElementById("intakePreview");
   const content = document.getElementById("intakeDropContent");
 
-  preview.src = URL.createObjectURL(f);
   preview.style.display = "block";
   preview.style.maxWidth = "100%";
   preview.style.maxHeight = "200px";
@@ -321,15 +344,14 @@ function previewIntakeImage(e) {
   preview.style.objectFit = "cover";
   content.style.display = "none";
 
-  intakeImageReading = new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      intakeImageBase64 = evt.target.result;
-      intakeImageReading = null;
-      resolve();
-    };
-    reader.readAsDataURL(f);
-  });
+  // Assigned synchronously so a fast click on Save (before this finishes)
+  // still finds a promise to await instead of saving with no photo.
+  intakeImageReading = (async () => {
+    const displayFile = await toDisplayableImage(f);
+    preview.src = URL.createObjectURL(displayFile);
+    intakeImageBase64 = await blobToDataURL(displayFile);
+    intakeImageReading = null;
+  })();
 }
 
 function openIntake(prefill=null){
@@ -476,23 +498,20 @@ function renderJobs(){
   document.getElementById("jobsTable").innerHTML=`<div class="table-head"><div>Nro</div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`+a.map(j=>`<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${statusLabel[j.status]}</span></div></div>`).join("");
 }
 
-function uploadDetailAfterImage(e, id) {
+async function uploadDetailAfterImage(e, id) {
   const f = e.target.files?.[0];
   if(!f) return;
-  
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    const base64 = evt.target.result;
-    const j = jobs.find(x => x.id === id);
-    if(j) {
-      j.img_after = base64;
-      saveState();
-      document.getElementById("detailAfterPreview").src = base64;
-      document.getElementById("detailAfterPreview").style.opacity = 1;
-      dbUpdateJobAfterImage(id, base64);
-    }
-  };
-  reader.readAsDataURL(f);
+
+  const displayFile = await toDisplayableImage(f);
+  const base64 = await blobToDataURL(displayFile);
+  const j = jobs.find(x => x.id === id);
+  if(j) {
+    j.img_after = base64;
+    saveState();
+    document.getElementById("detailAfterPreview").src = base64;
+    document.getElementById("detailAfterPreview").style.opacity = 1;
+    dbUpdateJobAfterImage(id, base64);
+  }
 }
 
 function openJob(id){
@@ -927,20 +946,19 @@ function setImportTab(tab,btn){document.querySelectorAll(".itab").forEach(x=>x.c
 let uploadedImageBase64 = null;
 let uploadedImageMimeType = null;
 
-function previewImportImage(e){
+async function previewImportImage(e){
   const f=e.target.files?.[0];
   if(!f)return;
-  uploadedImageMimeType = f.type;
   const img=document.getElementById("importPreview");
-  img.src=URL.createObjectURL(f);
-  img.style.display="block";
   document.getElementById("dropContent").style.display="none";
-  
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    uploadedImageBase64 = evt.target.result.split(",")[1];
-  };
-  reader.readAsDataURL(f);
+
+  const displayFile = await toDisplayableImage(f);
+  uploadedImageMimeType = displayFile.type;
+  img.src=URL.createObjectURL(displayFile);
+  img.style.display="block";
+
+  const dataUrl = await blobToDataURL(displayFile);
+  uploadedImageBase64 = dataUrl.split(",")[1];
 }
 
 function guessFields(text){
@@ -1387,33 +1405,30 @@ Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mu
 
 let afterImageBase64 = null;
 
-function loadAfterImage(e) {
+async function loadAfterImage(e) {
   const f = e.target.files?.[0];
   if(!f) return;
-  
+
   const preview = document.getElementById("afterImgPreview");
   const dropText = document.getElementById("afterDropText");
-  
-  preview.src = URL.createObjectURL(f);
-  preview.style.display = "block";
   dropText.style.display = "none";
-  
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    afterImageBase64 = evt.target.result;
-    
-    const select = document.getElementById("socialJobSelect");
-    const jobId = select.value;
-    if (jobId) {
-      const j = jobs.find(x => x.id === jobId);
-      if (j) {
-        j.img_after = afterImageBase64;
-        saveState();
-        dbUpdateJobAfterImage(jobId, afterImageBase64);
-      }
+
+  const displayFile = await toDisplayableImage(f);
+  preview.src = URL.createObjectURL(displayFile);
+  preview.style.display = "block";
+
+  afterImageBase64 = await blobToDataURL(displayFile);
+
+  const select = document.getElementById("socialJobSelect");
+  const jobId = select.value;
+  if (jobId) {
+    const j = jobs.find(x => x.id === jobId);
+    if (j) {
+      j.img_after = afterImageBase64;
+      saveState();
+      dbUpdateJobAfterImage(jobId, afterImageBase64);
     }
-  };
-  reader.readAsDataURL(f);
+  }
 }
 
 function renderSocial() {
