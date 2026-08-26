@@ -86,6 +86,17 @@ async function dbDeleteJob(id) {
   }
 }
 
+async function dbDeleteRequest(id) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("requests").delete().eq("id", id);
+      if(error) console.error("Supabase delete request error:", error);
+    } catch(err) {
+      console.error(err);
+    }
+  }
+}
+
 async function dbUpdateJobStatus(id, status) {
   if (supabaseClient) {
     try {
@@ -265,6 +276,11 @@ function previewIntakeImage(e) {
   
   preview.src = URL.createObjectURL(f);
   preview.style.display = "block";
+  preview.style.maxWidth = "100%";
+  preview.style.maxHeight = "200px";
+  preview.style.borderRadius = "8px";
+  preview.style.marginTop = "8px";
+  preview.style.objectFit = "cover";
   content.style.display = "none";
   
   const reader = new FileReader();
@@ -642,7 +658,9 @@ function openWorkshopChat(id,el){
     ${r.status==="arrived"?`<button class="side-action" onclick="openIntake(requests.find(x=>x.id===${r.id}))">🔧 LUO TYÖ</button>`:""}
     ${linked?`<button class="side-action alt" onclick="openJob('${linked.id}')">⚒ Avaa työ ${linked.id}</button>`:""}
     <div class="side-title" style="margin-top:14px">Pikavastaukset</div>
-    <div class="template-list"><div class="template" onclick="sendTemplate(${r.id},'price')">Hinta-arvio</div><div class="template" onclick="sendTemplate(${r.id},'bring')">Tuonti</div><div class="template" onclick="sendTemplate(${r.id},'ready')">Valmis</div></div>`;
+    <div class="template-list"><div class="template" onclick="sendTemplate(${r.id},'price')">Hinta-arvio</div><div class="template" onclick="sendTemplate(${r.id},'bring')">Tuonti</div><div class="template" onclick="sendTemplate(${r.id},'ready')">Valmis</div></div>
+    <hr style="border:0;border-top:1px solid var(--border);margin:15px 0">
+    <button class="side-action" style="background:#ef4444;color:white;font-weight:600;margin-top:8px;" onclick="deleteRequest(${r.id})">🗑️ POISTA KYSELY</button>`;
 }
 
 function markBring(id){let r=requests.find(x=>x.id===id);r.status="bring";r.reply="Hei! Tervetuloa tuomaan tuotteen meille. 😊";saveState();dbUpsertRequest(r);renderWhatsappV5()}
@@ -1503,6 +1521,15 @@ function deleteJob(id) {
     dbDeleteJob(id);
     showPage("home");
     renderHome();
+  }
+}
+
+function deleteRequest(id) {
+  if (confirm("Haluatko varmasti poistaa tämän kyselyn/viestin kokonaan? Tätä ei voi peruuttaa.")) {
+    requests = requests.filter(x => x.id !== id);
+    saveState();
+    dbDeleteRequest(id);
+    renderWhatsappV5();
   }
 }
 
