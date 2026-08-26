@@ -7,6 +7,8 @@ let requests=[];
 let requestSeq={store:146,whatsapp:87,email:33,post:20};
 let customerSeq=421;
 let jobSeq=153;
+let jobIdSeq=1053;
+let activeConvertingRequestId=null;
 
 let supabaseClient = null;
 
@@ -63,7 +65,7 @@ function initSupabase() {
 function saveState(){
   localStorage.setItem("suutari_jobs",JSON.stringify(jobs));
   localStorage.setItem("suutari_requests",JSON.stringify(requests));
-  localStorage.setItem("suutari_seqs",JSON.stringify({requestSeq,customerSeq,jobSeq}));
+  localStorage.setItem("suutari_seqs",JSON.stringify({requestSeq,customerSeq,jobSeq,jobIdSeq}));
 }
 
 async function dbInsertJob(j) {
@@ -166,6 +168,7 @@ async function initData(){
       requestSeq=seqs.requestSeq||requestSeq;
       customerSeq=seqs.customerSeq||customerSeq;
       jobSeq=seqs.jobSeq||jobSeq;
+      jobIdSeq=seqs.jobIdSeq||1053;
     }
   }else{
     jobs=[
@@ -182,7 +185,21 @@ async function initData(){
       {id:4,name:"Pekka T.",product:"Nahkatakki",work:"Vetoketjun vaihto",status:"new",img:bag,msg:"Paljonko uuden vetoketjun vaihto maksaa?",reply:""},
       {id:5,name:"Camilla R.",product:"Lompakko",work:"Vetoketju",status:"arrived",img:bag,msg:"Tuotu tänään.",reply:""}
     ];
-    saveState();
+    addDemoSources();
+  }
+
+  // Automatically determine next jobIdSeq based on max job ID in the list
+  if (jobs && jobs.length > 0) {
+    let maxId = 1052;
+    jobs.forEach(j => {
+      const num = parseInt(j.id.replace("#", ""), 10);
+      if (!isNaN(num) && num > maxId) {
+        maxId = num;
+      }
+    });
+    jobIdSeq = maxId + 1;
+  } else {
+    jobIdSeq = 1053;
   }
 
   // Try to connect to Supabase and pull fresh data
@@ -241,6 +258,7 @@ function openRequest(id){
 
 function convertRequest(id){
   let r=requests.find(x=>x.id===id);
+  activeConvertingRequestId = r.id;
   r.status="converted";
   saveState();
   dbUpsertRequest(r);
@@ -350,8 +368,13 @@ async function saveJob(addAnother = false){
   }
 
   let d=document.getElementById("date").value;
+  const nextId = "#" + jobIdSeq;
+  jobIdSeq++;
+  
+  const matchedReq = activeConvertingRequestId ? requests.find(x => x.id === activeConvertingRequestId) : null;
+
   let j={
-    id:"#"+(1050+jobs.length),
+    id: nextId,
     name:document.getElementById("n").value||"Uusi asiakas",
     phone:document.getElementById("p").value||"",
     product:document.getElementById("prod").value||"Tuote",
@@ -361,9 +384,18 @@ async function saveJob(addAnother = false){
     status:"active",
     loc:document.getElementById("loc").value||"A1-01",
     img:intakeImageBase64 || bag,
-    note:document.getElementById("note").value
+    note:document.getElementById("note").value,
+    request_id: matchedReq ? matchedReq.request_id : null
   };
   jobs.unshift(j);
+
+  if (matchedReq) {
+    matchedReq.job_id = j.id;
+    matchedReq.status = "converted";
+    dbUpsertRequest(matchedReq);
+    activeConvertingRequestId = null;
+  }
+
   saveState();
   dbInsertJob(j);
   renderHome();
@@ -700,7 +732,13 @@ async function login() {
 }
 
 async function logout() {
-  await supabaseClient.auth.signOut();
+  if (supabaseClient) {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch(err) {
+      console.error(err);
+    }
+  }
   currentUser = null;
   jobs = [];
   requests = [];
@@ -808,7 +846,7 @@ function renderWhatsappV5(){
 function openWorkshopChat(id,el){
   document.querySelectorAll(".chat-item").forEach(x=>x.classList.remove("active")); if(el)el.classList.add("active");
   const r=requests.find(x=>x.id===id);
-  const linked=jobs.find(j=>j.name===r.name);
+  const linked=jobs.find(j=>j.id===r.job_id || j.request_id===r.request_id || j.name===r.name);
   const status=r.status==="new"?"Uusi":r.status==="bring"?"Asiakas tuo":r.status==="arrived"?"Tuote saapui":r.status==="converted"?"Luotu työksi":"Vastattu";
   document.getElementById("chatWindow").innerHTML=`
   <div class="chat-head"><div class="chat-avatar">${r.name[0]}</div><div><b>${r.name}</b><small>${r.product} · ${r.work}</small></div><span class="chat-status">${status}</span></div>
@@ -1001,7 +1039,6 @@ function makeCustomerId(){customerSeq++;return `C-2026-${String(customerSeq).pad
 function makeJobId(){jobSeq++;return `J-2026-${String(jobSeq).padStart(6,"0")}`}
 function normalizeRequests(){requests.forEach(r=>{r.source=r.source||"whatsapp";r.request_id=r.request_id||makeRequestId(r.source);r.customer_id=r.customer_id||makeCustomerId();r.created_at=r.created_at||"2026-08-24";if(r.status==="converted"&&!r.job_id)r.job_id=makeJobId();if(r.price===undefined)r.price=""})}
 function addDemoSources(){let b=requests[0]||{name:"Anna Virtanen",product:"Käsilaukku",work:"Vetoketjun korjaus",msg:"Hei!",status:"new"};let d=[{...b,id:90001,name:"Mikko Laine",product:"Kengät",work:"Pohjan korjaus",msg:"Voitteko korjata pohjan?",status:"converted",source:"store",request_id:"S-2026-000146",customer_id:"C-2026-000422",created_at:"2026-08-22",job_id:"J-2026-00153",price:75},{...b,id:90002,name:"Sara Niemi",product:"Laukku",work:"Sauman korjaus",msg:"Paljonko maksaa?",status:"answered",source:"email",request_id:"E-2026-000033",customer_id:"C-2026-000423",created_at:"2026-08-23",price:""},{...b,id:90003,name:"John Smith",product:"Nahkatakki",work:"Vetoketjun vaihto",msg:"Lähetän takin postissa.",status:"bring",source:"post",request_id:"P-2026-000020",customer_id:"C-2026-000424",created_at:"2026-08-24",price:90}];d.forEach(x=>{if(!requests.some(r=>r.request_id===x.request_id))requests.push(x)});normalizeRequests();saveState();}
-addDemoSources();
 function getExportData(){let f=document.getElementById("exportFrom")?.value||"",t=document.getElementById("exportTo")?.value||"",s=document.getElementById("exportSource")?.value||"all",st=document.getElementById("exportStatus")?.value||"all";return requests.filter(r=>(!f||(r.created_at||"")>=f)&&(!t||(r.created_at||"")<=t)&&(s==="all"||r.source===s)&&(st==="all"||r.status===st))}
 
 function renderReports(){
@@ -1190,20 +1227,12 @@ async function parseMessageWithAI(text) {
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
   const targets = [
-    { ver: "v1", model: "gemini-2.5-flash" },
-    { ver: "v1beta", model: "gemini-2.5-flash" },
-    { ver: "v1", model: "gemini-2.5-flash-lite" },
-    { ver: "v1beta", model: "gemini-2.5-flash-lite" },
-    { ver: "v1", model: "gemini-2.5-pro" },
-    { ver: "v1beta", model: "gemini-2.5-pro" },
-    { ver: "v1", model: "gemini-3.5-flash" },
-    { ver: "v1beta", model: "gemini-3.5-flash" },
-    { ver: "v1", model: "gemini-3.6-flash" },
-    { ver: "v1beta", model: "gemini-3.6-flash" },
-    { ver: "v1", model: "gemini-3.7-flash" },
-    { ver: "v1beta", model: "gemini-3.7-flash" },
+    { ver: "v1", model: "gemini-2.0-flash" },
+    { ver: "v1beta", model: "gemini-2.0-flash" },
     { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" }
+    { ver: "v1beta", model: "gemini-1.5-flash" },
+    { ver: "v1", model: "gemini-1.5-pro" },
+    { ver: "v1beta", model: "gemini-1.5-pro" }
   ];
   
   const prompt = `Lue seuraava WhatsApp-keskustelu tai viesti ja poimi siitä tiedot JSON-muodossa. 
@@ -1264,20 +1293,12 @@ async function analyzeImageWithAI(base64Data, mimeType) {
   
   const instructions = localStorage.getItem("suutari_ai_instructions") || "";
   const targets = [
-    { ver: "v1", model: "gemini-2.5-flash" },
-    { ver: "v1beta", model: "gemini-2.5-flash" },
-    { ver: "v1", model: "gemini-2.5-flash-lite" },
-    { ver: "v1beta", model: "gemini-2.5-flash-lite" },
-    { ver: "v1", model: "gemini-2.5-pro" },
-    { ver: "v1beta", model: "gemini-2.5-pro" },
-    { ver: "v1", model: "gemini-3.5-flash" },
-    { ver: "v1beta", model: "gemini-3.5-flash" },
-    { ver: "v1", model: "gemini-3.6-flash" },
-    { ver: "v1beta", model: "gemini-3.6-flash" },
-    { ver: "v1", model: "gemini-3.7-flash" },
-    { ver: "v1beta", model: "gemini-3.7-flash" },
+    { ver: "v1", model: "gemini-2.0-flash" },
+    { ver: "v1beta", model: "gemini-2.0-flash" },
     { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" }
+    { ver: "v1beta", model: "gemini-1.5-flash" },
+    { ver: "v1", model: "gemini-1.5-pro" },
+    { ver: "v1beta", model: "gemini-1.5-pro" }
   ];
   
   const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva vauriosta/tuotteesta ja poimi tiedot JSON-muodossa. 
@@ -1468,20 +1489,12 @@ Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (In
 Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
 
   const targets = [
-    { ver: "v1", model: "gemini-2.5-flash" },
-    { ver: "v1beta", model: "gemini-2.5-flash" },
-    { ver: "v1", model: "gemini-2.5-flash-lite" },
-    { ver: "v1beta", model: "gemini-2.5-flash-lite" },
-    { ver: "v1", model: "gemini-2.5-pro" },
-    { ver: "v1beta", model: "gemini-2.5-pro" },
-    { ver: "v1", model: "gemini-3.5-flash" },
-    { ver: "v1beta", model: "gemini-3.5-flash" },
-    { ver: "v1", model: "gemini-3.6-flash" },
-    { ver: "v1beta", model: "gemini-3.6-flash" },
-    { ver: "v1", model: "gemini-3.7-flash" },
-    { ver: "v1beta", model: "gemini-3.7-flash" },
+    { ver: "v1", model: "gemini-2.0-flash" },
+    { ver: "v1beta", model: "gemini-2.0-flash" },
     { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" }
+    { ver: "v1beta", model: "gemini-1.5-flash" },
+    { ver: "v1", model: "gemini-1.5-pro" },
+    { ver: "v1beta", model: "gemini-1.5-pro" }
   ];
   let success = false;
   
@@ -1688,12 +1701,37 @@ function sendWhatsAppReply() {
 }
 
 function convertRequestToJob() {
+  const name=document.getElementById("exName").value.trim()||"Uusi asiakas";
+  const product=document.getElementById("exProduct").value.trim()||"Tuote";
+  const work=document.getElementById("exWork").value.trim()||"Korjausarvio";
+  const msg=document.getElementById("exMessage").value.trim();
+  const status="converted";
+  const newReq = {
+    id:Date.now(),
+    name,
+    product,
+    work,
+    msg,
+    status,
+    reply:"",
+    source:"whatsapp",
+    request_id:makeRequestId("whatsapp"),
+    customer_id:makeCustomerId(),
+    created_at:new Date().toISOString().slice(0,10),
+    price:document.getElementById("exPrice").value
+  };
+  requests.unshift(newReq);
+  saveState();
+  dbUpsertRequest(newReq);
+  
+  activeConvertingRequestId = newReq.id;
+  
   const prefill = {
-    name: document.getElementById("exName").value,
+    name: newReq.name,
     phone: document.getElementById("exPhone").value,
-    product: document.getElementById("exProduct").value,
-    work: document.getElementById("exWork").value,
-    price: document.getElementById("exPrice").value,
+    product: newReq.product,
+    work: newReq.work,
+    price: newReq.price,
     img: uploadedImageBase64 || null
   };
   closeModal();
@@ -1793,5 +1831,6 @@ function deleteRequest(id) {
     renderWhatsappV5();
   }
 }
+
 
 
