@@ -94,10 +94,21 @@ function initSupabase() {
 }
 
 function saveState(){
-  localStorage.setItem("suutari_jobs",JSON.stringify(jobs));
-  localStorage.setItem("suutari_requests",JSON.stringify(requests));
-  localStorage.setItem("suutari_seqs",JSON.stringify({requestSeq,customerSeq,jobSeq,jobIdSeq}));
-  localStorage.setItem("suutari_todos",JSON.stringify(todos));
+  // Real photos are several MB as base64 — caching them in localStorage
+  // (on top of what's already saved to Supabase) fills the browser's quota
+  // after just a few jobs and throws, which used to abort the whole save.
+  // The local cache only needs to survive until the next Supabase sync, so
+  // strip the heavy image fields from what gets cached; the DB keeps them.
+  try {
+    const lightJobs = jobs.map(({img, img_after, ...rest}) => rest);
+    const lightRequests = requests.map(({img, ...rest}) => rest);
+    localStorage.setItem("suutari_jobs", JSON.stringify(lightJobs));
+    localStorage.setItem("suutari_requests", JSON.stringify(lightRequests));
+    localStorage.setItem("suutari_seqs", JSON.stringify({requestSeq,customerSeq,jobSeq,jobIdSeq}));
+    localStorage.setItem("suutari_todos", JSON.stringify(todos));
+  } catch (err) {
+    console.error("Local cache save failed (data is still saved to the database):", err);
+  }
   updateBadges();
 }
 
