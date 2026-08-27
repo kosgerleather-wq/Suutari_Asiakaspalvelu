@@ -2084,10 +2084,10 @@ function renderMorningBrief() {
     items.push(`⚠️ <strong>${riskJobs.length} työ(tä) odottaa materiaaleja, vaikka toimitusaika on alle 48 tunnin päästä!</strong>`);
   }
 
-  // 4. WhatsApp uudet viestit (New WhatsApp inquiries)
-  const newRequestsCount = requests.filter(r => r.source === "whatsapp" && r.status === "new").length;
-  if (newRequestsCount > 0) {
-    items.push(`💬 <strong>${newRequestsCount} uutta WhatsApp-kyselyä odottaa vastaustasi.</strong>`);
+  // 4. WhatsApp-lähteiset työt jotka odottavat tuotteen saapumista
+  const whatsappWaitingCount = jobs.filter(j => j.source === "whatsapp" && j.status === "waiting").length;
+  if (whatsappWaitingCount > 0) {
+    items.push(`💬 <strong>${whatsappWaitingCount} WhatsApp-tuotetta odottaa saapumista.</strong>`);
   }
 
   if (items.length > 0) {
