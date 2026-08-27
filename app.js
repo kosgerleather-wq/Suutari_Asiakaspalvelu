@@ -202,6 +202,17 @@ async function dbUpdateJobAfterImage(id, img_after) {
   }
 }
 
+async function dbUpdateJob(id, fields) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("jobs").update(fields).eq("id", id);
+      if(error) console.error("Supabase update job error:", error);
+    } catch(err) {
+      console.error(err);
+    }
+  }
+}
+
 async function dbUpsertRequest(r) {
   if (supabaseClient) {
     try {
@@ -623,10 +634,60 @@ function openJob(id){
     </div>
     <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${steps.map((s,i)=>`<div class="step ${i<3?"done":i===3&&j.status==="ready"?"active":""}"><i></i><div><b>${s}</b><small>${i===0?"23.08.2026":i===2?"Nyt":i===4?j.date:""}</small></div></div>`).join("")}</div>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer" onclick="openStatus('${j.id}')">PÄIVITÄ TILA</button>
+      <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--primary-light);color:var(--primary);" onclick="openEditJob('${j.id}')">✏️ MUOKKAA TIETOJA</button>
+      <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--teal-light);color:var(--teal);" onclick="addAnotherProductForCustomer('${j.id}')">➕ LISÄÄ UUSI TUOTE TÄLLE ASIAKKAALLE</button>
       <button class="delete-btn" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:#ef4444;color:white;font-weight:600;" onclick="deleteJob('${j.id}')">🗑️ POISTA TYÖ</button>
     </div>
   </div>`;
   showPage("job");
+}
+
+function openEditJob(id){
+  const j=jobs.find(x=>x.id===id);
+  if(!j) return;
+  const isoDate = j.date ? j.date.split(".").reverse().join("-") : "";
+  document.getElementById("modalBody").innerHTML=`<h2>✏️ Muokkaa tietoja · ${j.id}</h2>
+<div class="form">
+  <div class="field"><label>Asiakas</label><input id="editName" value="${j.name||""}" placeholder="Nimi"></div>
+  <div class="field"><label>Puhelin</label><input id="editPhone" value="${j.phone||""}" placeholder="040..."></div>
+  <div class="field"><label>Tuote</label><input id="editProd" list="tuoteOptions" value="${j.product||""}"></div>
+  <div class="field"><label>Korjaus</label><input id="editWork" list="korjausOptions" value="${j.work||""}"></div>
+  <div class="field"><label>Hinta (€)</label><input id="editPrice" type="number" value="${j.price||0}"></div>
+  <div class="field"><label>Toimitus</label><input id="editDate" type="date" value="${isoDate}"></div>
+  <div class="field full"><label>Hylly / sijainti</label><input id="editLoc" value="${j.loc||""}"></div>
+  <div class="field full"><label>Sisäinen huomautus</label><textarea id="editNote">${j.note||""}</textarea></div>
+</div>
+<div class="modal-actions">
+  <button class="cancel" onclick="closeModal()">Peruuta</button>
+  <button class="save" onclick="saveEditJob('${j.id}')">TALLENNA MUUTOKSET</button>
+</div>`;
+  document.getElementById("modal").classList.remove("hidden");
+}
+
+function saveEditJob(id){
+  const j=jobs.find(x=>x.id===id);
+  if(!j) return;
+  j.name = document.getElementById("editName").value.trim() || j.name;
+  j.phone = document.getElementById("editPhone").value.trim();
+  j.product = document.getElementById("editProd").value.trim() || j.product;
+  j.work = document.getElementById("editWork").value.trim() || j.work;
+  j.price = +document.getElementById("editPrice").value || 0;
+  const d = document.getElementById("editDate").value;
+  if(d) j.date = d.split("-").reverse().join(".");
+  j.loc = document.getElementById("editLoc").value.trim() || j.loc;
+  j.note = document.getElementById("editNote").value;
+
+  saveState();
+  dbUpdateJob(id, {name:j.name, phone:j.phone, product:j.product, work:j.work, price:j.price, date:j.date, loc:j.loc, note:j.note});
+  closeModal();
+  openJob(id);
+  renderHome();
+}
+
+function addAnotherProductForCustomer(id){
+  const j=jobs.find(x=>x.id===id);
+  if(!j) return;
+  openIntake({name:j.name, phone:j.phone});
 }
 
 function openStatus(id){
