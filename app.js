@@ -1,18 +1,12 @@
 const bag="https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=500&q=80";
 
-// iPhones save camera photos as HEIC by default, which no browser except
-// Safari can decode into <img> — they show as blank. Convert to JPEG first
-// so uploaded photos always actually render.
+// Kept as a passthrough (no HEIC->JPEG conversion) — that added an external
+// library dependency that caused more problems than it solved. If a photo
+// is HEIC (iPhone default), it won't preview in-app; the reliable fix is
+// changing the iPhone's camera format to JPEG (Settings > Camera > Formats
+// > Most Compatible), not client-side conversion.
 async function toDisplayableImage(file) {
-  const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name || "");
-  if (!isHeic || typeof heic2any === "undefined") return file;
-  try {
-    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
-    return Array.isArray(converted) ? converted[0] : converted;
-  } catch (err) {
-    console.error("HEIC conversion failed:", err);
-    return file;
-  }
+  return file;
 }
 
 function blobToDataURL(blob) {
