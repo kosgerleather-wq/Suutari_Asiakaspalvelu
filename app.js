@@ -335,7 +335,7 @@ function convertRequest(id){
 }
 
 function openRequestForm(){
-  document.getElementById("modalBody").innerHTML=`<h2>Uusi asiakastiedustelu</h2><p style="font-size:12px;color:#78858d">Tallenna WhatsApp-kysely nopeasti.</p><div class="form"><div class="field"><label>Nimi</label><input id="reqName" placeholder="Anna Virtanen"></div><div class="field"><label>Puhelin</label><input id="reqPhone" placeholder="040..."></div><div class="field"><label>Tuote</label><input id="reqProd" placeholder="Käsilaukku"></div><div class="field"><label>Työ</label><input id="reqWork" placeholder="Vetoketjun vaihto"></div><div class="field full"><label>Viesti</label><textarea id="reqMsg" placeholder="Viestin sisältö..."></textarea></div></div><div class="modal-actions"><button class="cancel" onclick="closeModal()">Peruuta</button><button class="save" onclick="saveRequestForm()">TALLENNA KYSELY</button></div>`;
+  document.getElementById("modalBody").innerHTML=`<h2>Uusi asiakastiedustelu</h2><p style="font-size:12px;color:#78858d">Tallenna WhatsApp-kysely nopeasti.</p><div class="form"><div class="field"><label>Nimi</label><input id="reqName" placeholder="Anna Virtanen"></div><div class="field"><label>Puhelin</label><input id="reqPhone" placeholder="040..."></div><div class="field"><label>Tuote</label><input id="reqProd" list="tuoteOptions" placeholder="Käsilaukku"></div><div class="field"><label>Työ</label><input id="reqWork" list="korjausOptions" placeholder="Vetoketjun vaihto"></div><div class="field full"><label>Viesti</label><textarea id="reqMsg" placeholder="Viestin sisältö..."></textarea></div></div><div class="modal-actions"><button class="cancel" onclick="closeModal()">Peruuta</button><button class="save" onclick="saveRequestForm()">TALLENNA KYSELY</button></div>`;
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -413,8 +413,8 @@ function openIntake(prefill=null){
 <div class="form">
   <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi"></div>
   <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
-  <div class="field"><label>Tuote</label><input id="prod" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku"></div>
-  <div class="field"><label>Korjaus</label><input id="work" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto"></div>
+  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku"></div>
+  <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto"></div>
   <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"></div>
   <div class="field"><label>Toimitus</label><input id="date" type="date" value="2026-08-28"></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
