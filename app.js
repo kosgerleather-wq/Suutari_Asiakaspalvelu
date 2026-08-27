@@ -1,5 +1,19 @@
 const bag="https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=500&q=80";
 
+// Safety net: surface any otherwise-silent JS error on screen (once per
+// page load) instead of a button/action just appearing to do nothing.
+let __shownErrorAlert = false;
+window.addEventListener("error", (e) => {
+  if (__shownErrorAlert) return;
+  __shownErrorAlert = true;
+  alert("Odottamaton virhe: " + (e.message || e) + "\n\nOta kuvakaappaus ja lähetä eteenpäin.");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  if (__shownErrorAlert) return;
+  __shownErrorAlert = true;
+  alert("Odottamaton virhe: " + (e.reason?.message || e.reason) + "\n\nOta kuvakaappaus ja lähetä eteenpäin.");
+});
+
 // Kept as a passthrough (no HEIC->JPEG conversion) — that added an external
 // library dependency that caused more problems than it solved. If a photo
 // is HEIC (iPhone default), it won't preview in-app; the reliable fix is
@@ -436,78 +450,85 @@ async function saveJob(addAnother = false){
     }
   }
 
-  let d=document.getElementById("date").value;
-  const nextId = "#" + jobIdSeq;
-  jobIdSeq++;
-  
-  const matchedReq = activeConvertingRequestId ? requests.find(x => x.id === activeConvertingRequestId) : null;
+  // Wrapped so any unexpected error shows up on screen instead of silently
+  // leaving the button looking like it did nothing.
+  try {
+    let d=document.getElementById("date").value;
+    const nextId = "#" + jobIdSeq;
+    jobIdSeq++;
 
-  let j={
-    id: nextId,
-    name:document.getElementById("n").value||"Uusi asiakas",
-    phone:document.getElementById("p").value||"",
-    product:document.getElementById("prod").value||"Tuote",
-    work:document.getElementById("work").value||"Korjaus",
-    price:+document.getElementById("price").value||0,
-    date:d?d.split("-").reverse().join("."):"28.08.2026",
-    status:"active",
-    loc:document.getElementById("loc").value||"A1-01",
-    img:intakeImageBase64 || bag,
-    note:document.getElementById("note").value,
-    request_id: matchedReq ? matchedReq.request_id : null
-  };
-  jobs.unshift(j);
+    const matchedReq = activeConvertingRequestId ? requests.find(x => x.id === activeConvertingRequestId) : null;
 
-  if (matchedReq) {
-    matchedReq.job_id = j.id;
-    matchedReq.status = "converted";
-    dbUpsertRequest(matchedReq);
-    activeConvertingRequestId = null;
-  }
+    let j={
+      id: nextId,
+      name:document.getElementById("n").value||"Uusi asiakas",
+      phone:document.getElementById("p").value||"",
+      product:document.getElementById("prod").value||"Tuote",
+      work:document.getElementById("work").value||"Korjaus",
+      price:+document.getElementById("price").value||0,
+      date:d?d.split("-").reverse().join("."):"28.08.2026",
+      status:"active",
+      loc:document.getElementById("loc").value||"A1-01",
+      img:intakeImageBase64 || bag,
+      note:document.getElementById("note").value,
+      request_id: matchedReq ? matchedReq.request_id : null
+    };
+    jobs.unshift(j);
 
-  saveState();
-  dbInsertJob(j);
-  renderHome();
-  
-  if (addAnother) {
-    // Reset product fields, but keep name and phone
-    document.getElementById("prod").value = "";
-    document.getElementById("work").value = "";
-    document.getElementById("price").value = "45";
-    document.getElementById("note").value = "";
-    
-    // Reset image
-    intakeImageBase64 = null;
-    const intakePreview = document.getElementById("intakePreview");
-    if (intakePreview) {
-      intakePreview.src = "";
-      intakePreview.style.display = "none";
-    }
-    const intakeDropContent = document.getElementById("intakeDropContent");
-    if (intakeDropContent) {
-      intakeDropContent.innerHTML = '📷 Ota kuva / valitse tiedosto<br><small style="font-size:11px;">Ennen-kuva suositeltava</small>';
-      intakeDropContent.style.display = "block";
+    if (matchedReq) {
+      matchedReq.job_id = j.id;
+      matchedReq.status = "converted";
+      dbUpsertRequest(matchedReq);
+      activeConvertingRequestId = null;
     }
 
-    // Show feedback alert in modal
-    const feedback = document.createElement("div");
-    feedback.style.color = "var(--teal)";
-    feedback.style.fontSize = "13px";
-    feedback.style.fontWeight = "600";
-    feedback.style.marginTop = "15px";
-    feedback.style.textAlign = "center";
-    feedback.id = "intakeFeedback";
-    feedback.textContent = `✓ Työ tallennettu! Seurantakoodi: ${j.id}. Voit syöttää seuraavan tuotteen.`;
-    
-    const existingFeedback = document.getElementById("intakeFeedback");
-    if (existingFeedback) existingFeedback.remove();
-    
-    document.querySelector(".modal-box").appendChild(feedback);
-    setTimeout(() => { if(feedback) feedback.remove(); }, 5000);
-  } else {
-    closeModal();
-    openJob(j.id);
-    intakeImageBase64 = null;
+    saveState();
+    dbInsertJob(j);
+    renderHome();
+
+    if (addAnother) {
+      // Reset product fields, but keep name and phone
+      document.getElementById("prod").value = "";
+      document.getElementById("work").value = "";
+      document.getElementById("price").value = "45";
+      document.getElementById("note").value = "";
+
+      // Reset image
+      intakeImageBase64 = null;
+      const intakePreview = document.getElementById("intakePreview");
+      if (intakePreview) {
+        intakePreview.src = "";
+        intakePreview.style.display = "none";
+      }
+      const intakeDropContent = document.getElementById("intakeDropContent");
+      if (intakeDropContent) {
+        intakeDropContent.innerHTML = '📷 Ota kuva / valitse tiedosto<br><small style="font-size:11px;">Ennen-kuva suositeltava</small>';
+        intakeDropContent.style.display = "block";
+      }
+
+      // Show feedback alert in modal
+      const feedback = document.createElement("div");
+      feedback.style.color = "var(--teal)";
+      feedback.style.fontSize = "13px";
+      feedback.style.fontWeight = "600";
+      feedback.style.marginTop = "15px";
+      feedback.style.textAlign = "center";
+      feedback.id = "intakeFeedback";
+      feedback.textContent = `✓ Työ tallennettu! Seurantakoodi: ${j.id}. Voit syöttää seuraavan tuotteen.`;
+
+      const existingFeedback = document.getElementById("intakeFeedback");
+      if (existingFeedback) existingFeedback.remove();
+
+      document.querySelector(".modal-box").appendChild(feedback);
+      setTimeout(() => { if(feedback) feedback.remove(); }, 5000);
+    } else {
+      closeModal();
+      openJob(j.id);
+      intakeImageBase64 = null;
+    }
+  } catch (err) {
+    console.error("saveJob failed:", err);
+    alert("Tallennus epäonnistui: " + err.message + "\n\nOta kuvakaappaus tästä viestistä ja lähetä se eteenpäin.");
   }
 }
 
