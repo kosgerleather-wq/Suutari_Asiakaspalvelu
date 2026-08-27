@@ -226,8 +226,10 @@
       <button onclick="setJobFilter('active', this)">Työn alla</button>
       <button onclick="setJobFilter('waiting', this)">Odottaa</button>
       <button onclick="setJobFilter('ready', this)">Valmis</button>
+      <button onclick="setJobFilter('done', this)">✔ Teslim edildi</button>
     </div>
   </div>
+  <p id="deliveredStats" style="font-size:12px;color:var(--text-muted);font-weight:600;margin:0 0 12px;"></p>
   <div class="table-card" id="jobsTable"></div>
 </section>
 
@@ -687,6 +689,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260828_0300"></script>
+<script src="app.js?v=20260828_0400"></script>
 </body>
 </html>

@@ -584,14 +584,74 @@ function setJobFilter(filter, btn) {
   renderJobs();
 }
 
+function parseFinDate(str){
+  if(!str) return null;
+  const parts = str.split(".");
+  if(parts.length !== 3) return null;
+  const d = new Date(+parts[2], +parts[1]-1, +parts[0]);
+  return isNaN(d) ? null : d;
+}
+
+function updateDeliveredStats(){
+  const el = document.getElementById("deliveredStats");
+  if(!el) return;
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  const dayNum = startOfWeek.getDay() || 7;
+  startOfWeek.setDate(now.getDate() - dayNum + 1);
+  startOfWeek.setHours(0,0,0,0);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const doneJobs = jobs.filter(j => j.status === "done");
+  const deliveredDate = j => j.delivered_at ? new Date(j.delivered_at) : parseFinDate(j.date);
+  const weekCount = doneJobs.filter(j => { const d = deliveredDate(j); return d && d >= startOfWeek; }).length;
+  const monthCount = doneJobs.filter(j => { const d = deliveredDate(j); return d && d >= startOfMonth; }).length;
+
+  el.textContent = `✔ Toimitettu tällä viikolla: ${weekCount} · Tässä kuussa: ${monthCount} · Yhteensä: ${doneJobs.length}`;
+}
+
 function renderJobs(){
   let q=(document.getElementById("search")?.value||"").toLowerCase();
   let a=jobs.filter(j=>(j.id+j.name+j.product+j.work).toLowerCase().includes(q));
-  if(currentJobFilter === "active") a = a.filter(j => j.status === "active" || j.status === "late");
-  if(currentJobFilter === "waiting") a = a.filter(j => j.status === "waiting");
-  if(currentJobFilter === "ready") a = a.filter(j => j.status === "ready");
 
-  document.getElementById("jobsTable").innerHTML=`<div class="table-head"><div>Nro</div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`+a.map(j=>`<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${statusLabel[j.status]}</span></div></div>`).join("");
+  const tableHead = `<div class="table-head"><div>Nro</div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
+  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${j.status==='late'?'red':j.status==='waiting'||j.status==='arrived'?'orange':'teal'}">${statusLabel[j.status]||j.status}</span></div></div>`;
+  const empty = `<p style="text-align:center;color:var(--text-muted);padding:30px 0;">Ei töitä.</p>`;
+
+  updateDeliveredStats();
+
+  if(currentJobFilter === "done"){
+    const done = a.filter(j => j.status === "done")
+      .sort((x,y)=> new Date(y.delivered_at||0) - new Date(x.delivered_at||0));
+    document.getElementById("jobsTable").innerHTML = done.length ? (tableHead + done.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "active"){
+    a = a.filter(j => j.status === "active" || j.status === "late");
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "waiting"){
+    a = a.filter(j => j.status === "waiting" || j.status === "arrived");
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "ready"){
+    a = a.filter(j => j.status === "ready");
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+
+  // "Kaikki" — grouped by stage, delivered jobs excluded from this default view
+  const groups = [
+    ["⏳ Odottaa", a.filter(j => j.status === "waiting" || j.status === "arrived")],
+    ["🔧 Työn alla", a.filter(j => j.status === "active" || j.status === "late")],
+    ["✅ Valmis", a.filter(j => j.status === "ready")]
+  ].filter(([,list]) => list.length);
+
+  document.getElementById("jobsTable").innerHTML = groups.length ? groups.map(([title,list])=>
+    `<div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:var(--primary);">${title} <span style="color:var(--text-muted);font-weight:600;">(${list.length})</span></div>${tableHead}${list.map(rowHtml).join("")}`
+  ).join("") : empty;
 }
 
 async function uploadDetailAfterImage(e, id) {
@@ -729,11 +789,18 @@ function openStatus(id){
 function setStatus(id,s){
   const j = jobs.find(job=>job.id===id);
   j.status=s;
-  saveState();
-  dbUpdateJobStatus(id, s);
+  if (s === "done" && !j.delivered_at) {
+    j.delivered_at = new Date().toISOString();
+    saveState();
+    dbUpdateJob(id, {status: s, delivered_at: j.delivered_at});
+  } else {
+    saveState();
+    dbUpdateJobStatus(id, s);
+  }
   closeModal();
   openJob(id);
   renderHome();
+  renderJobs();
 
   if (s === "ready" || s === "waiting") {
     setTimeout(() => {
@@ -1359,6 +1426,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     note TEXT,
     request_id TEXT,
     source TEXT DEFAULT 'store',
+    delivered_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -1368,6 +1436,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS phone TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS request_id TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'store';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
