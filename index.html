@@ -86,7 +86,6 @@
   </div>
   <nav>
     <button class="active" data-page="home">⌂ <span>Tänään</span></button>
-    <button data-page="inbox">◉ <span>Viestit</span><em id="inboxBadge">0</em></button>
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
     <button data-page="shelves">◰ <span>Hyllykartta</span></button>
@@ -138,7 +137,7 @@
     <div class="stat orange"><small>Toimitus tänään</small><strong id="statDueToday">0</strong><span>2 tunnin sisällä</span></div>
     <div class="stat blue"><small>Verstaalla</small><strong id="statInProgress">0</strong><span>Työn alla</span></div>
     <div class="stat teal"><small>Valmis</small><strong id="statReady">0</strong><span>Asiakasta odotetaan</span></div>
-    <div class="stat purple"><small>Uusi viesti</small><strong id="statNewMsg">0</strong><span>WhatsApp</span></div>
+    <div class="stat purple"><small>WhatsApp odottaa</small><strong id="statNewMsg">0</strong><span>Tuote ei vielä saapunut</span></div>
   </div>
 
   <div class="section-title">
@@ -153,18 +152,6 @@
       <div id="today"></div>
     </div>
     <div style="display:flex; flex-direction:column; gap:20px;">
-      <div class="card">
-        <div class="card-title"><h2>💬 WhatsApp</h2><button onclick="showPage('inbox')">Avaa →</button></div>
-        <div class="message-summary">
-          <div class="big-number" id="waBigNumber">0</div>
-          <div>
-            <b>uutta asiakaskyselyä</b>
-            <p id="waBringText">0 asiakasta tuo tuotteen pian verstaalle.</p>
-          </div>
-        </div>
-        <button class="wide-btn" onclick="showPage('inbox')">Seuraa viestejä</button>
-      </div>
-      
       <!-- Tehtävälista (Muistilista) -->
       <div class="card">
         <div class="card-title">
@@ -622,7 +609,6 @@
 
 <nav class="mobile-nav">
   <button data-page="home" class="active">⌂<small>Tänään</small></button>
-  <button data-page="inbox">◉<small>Viestit</small></button>
   <button data-page="jobs">⚒<small>Työt</small></button>
   <button data-page="calendar">▦<small>Kalenteri</small></button>
   <button data-page="customers">♙<small>Asiakkaat</small></button>
@@ -701,6 +687,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260828_0100"></script>
+<script src="app.js?v=20260828_0200"></script>
 </body>
 </html>

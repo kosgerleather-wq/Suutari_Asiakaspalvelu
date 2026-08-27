@@ -128,17 +128,15 @@ function updateBadges(){
   const readyJobs = jobs.filter(j=>j.status==="ready").length;
   const dueTodayJobs = jobs.filter(j=>j.date===todayDateStr()).length;
   const todayListCount = Math.min(jobs.length, 4);
+  const whatsappWaiting = jobs.filter(j=>j.source==="whatsapp" && j.status==="waiting").length;
 
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
-  set("inboxBadge", newRequests);
-  set("statActionsNeeded", lateJobs + newRequests);
+  set("statActionsNeeded", lateJobs + whatsappWaiting);
   set("statDueToday", dueTodayJobs);
   set("statInProgress", activeJobs);
   set("statReady", readyJobs);
-  set("statNewMsg", newRequests);
+  set("statNewMsg", whatsappWaiting);
   set("todayCount", `${todayListCount} työtä`);
-  set("waBigNumber", newRequests);
-  set("waBringText", `${bringRequests} asiakasta tuo tuotteen pian verstaalle.`);
   set("pipelineNew", newRequests);
   set("pipelineAnswered", answeredRequests);
   set("pipelineBring", bringRequests);
@@ -285,7 +283,7 @@ async function initData(){
   }
 }
 
-const statusLabel={active:"Työn alla",waiting:"Odottaa",ready:"Noudettavissa",late:"Myöhässä"};
+const statusLabel={active:"Työn alla",waiting:"Odottaa",ready:"Noudettavissa",late:"Myöhässä",arrived:"Tuote saapui",done:"Luovutettu"};
 
 function showPage(id){
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
@@ -314,7 +312,7 @@ function showPage(id){
 }
 document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dataset.page));
 
-function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<small>${statusLabel[j.status]}</small></div></div>`}
+function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<small>${statusLabel[j.status]||j.status}</small></div></div>`}
 
 function renderHome(){
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${j.status==='late'?'MYÖHÄSSÄ':j.status==='waiting'?'ODOTTAA':'AKTIIVINEN'}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
@@ -408,6 +406,12 @@ function previewIntakeImage(e) {
   })();
 }
 
+function toggleWhatsappTracking(){
+  const source = document.getElementById("source")?.value;
+  const field = document.getElementById("whatsappTrackingField");
+  if(field) field.style.display = source === "whatsapp" ? "block" : "none";
+}
+
 function openIntake(prefill=null){
   intakeImageReading = null;
   let initialImgStyle = "display:none;";
@@ -429,6 +433,21 @@ function openIntake(prefill=null){
   <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"></div>
   <div class="field"><label>Toimitus</label><input id="date" type="date" value="2026-08-28"></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
+  <div class="field full">
+    <label>Lähde</label>
+    <select id="source" onchange="toggleWhatsappTracking()">
+      <option value="store" ${prefill?.source!=="whatsapp"?"selected":""}>🏪 Myymälä</option>
+      <option value="whatsapp" ${prefill?.source==="whatsapp"?"selected":""}>💬 WhatsApp</option>
+    </select>
+  </div>
+  <div id="whatsappTrackingField" class="field full" style="display:${prefill?.source==="whatsapp"?"block":"none"};">
+    <label>WhatsApp-seuranta</label>
+    <select id="whatsappStage">
+      <option value="waiting">⏳ Odottaa (tuote ei vielä saapunut)</option>
+      <option value="arrived">📦 Tuote saapui</option>
+      <option value="done">✔ Toimitettu</option>
+    </select>
+  </div>
   <div class="field full">
     <label>Kuva</label>
     <label class="dropzone" id="intakeDropzone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: var(--bg); min-height: 100px; position: relative;">
@@ -480,6 +499,8 @@ async function saveJob(addAnother = false){
     jobIdSeq++;
 
     const matchedReq = activeConvertingRequestId ? requests.find(x => x.id === activeConvertingRequestId) : null;
+    const source = document.getElementById("source")?.value || "store";
+    const status = source === "whatsapp" ? (document.getElementById("whatsappStage")?.value || "waiting") : "active";
 
     let j={
       id: nextId,
@@ -489,7 +510,8 @@ async function saveJob(addAnother = false){
       work:document.getElementById("work").value||"Korjaus",
       price:+document.getElementById("price").value||0,
       date:d?d.split("-").reverse().join("."):"28.08.2026",
-      status:"active",
+      status,
+      source,
       loc:document.getElementById("loc").value||"A1-01",
       img:intakeImageBase64 || bag,
       note:document.getElementById("note").value,
@@ -617,7 +639,7 @@ function openJob(id){
       <div>
         <h2 style="margin:0 0 5px;font-size:18px">${j.name}</h2>
         <p style="font-size:12px;color:#7d8990;margin:0 0 5px;">${j.product}</p>
-        <span class="pill teal">${j.loc}</span>
+        <span class="pill teal">${j.loc}</span>${j.source==="whatsapp"?' <span class="pill" style="background:#e8f7f7;color:#138c8c;">💬 WhatsApp</span>':""}
       </div>
       <hr style="border:0;border-top:1px solid #e6edef;margin:18px 0">
       <b style="font-size:11px">Työ</b><p style="font-size:13px">${j.work} · <strong>${j.price} €</strong></p>
@@ -692,9 +714,12 @@ function addAnotherProductForCustomer(id){
 
 function openStatus(id){
   const j=jobs.find(x=>x.id===id);
-  document.getElementById("modalBody").innerHTML=`<h2>Muuta tilaa · ${j.id}</h2><p style="font-size:12px;color:#78858d">${j.name} · ${j.product}</p>
+  const options = j.source === "whatsapp"
+    ? [["waiting","⏳ Odottaa (tuote ei vielä saapunut)"],["arrived","📦 Tuote saapui"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Toimitettu"]]
+    : [["waiting","⏳ Materiaalia odotetaan"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Luovutettu"]];
+  document.getElementById("modalBody").innerHTML=`<h2>Muuta tilaa · ${j.id}</h2><p style="font-size:12px;color:#78858d">${j.name} · ${j.product}${j.source==="whatsapp"?" · 💬 WhatsApp":""}</p>
 <div style="display:grid;gap:7px;margin-top:15px">
-  ${[["waiting","⏳ Materiaalia odotetaan"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Luovutettu"]].map(x=>`<button class="wide-btn" onclick="setStatus('${j.id}','${x[0]}')">${x[1]}</button>`).join("")}
+  ${options.map(x=>`<button class="wide-btn" onclick="setStatus('${j.id}','${x[0]}')">${x[1]}</button>`).join("")}
   <hr style="border:0;border-top:1px solid var(--border);margin:10px 0">
   <button class="wide-btn" style="background:#ef4444;color:white;font-weight:600;" onclick="closeModal();deleteJob('${j.id}');">🗑️ POISTA TÄMÄ TYÖ</button>
 </div>`;
@@ -1333,6 +1358,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     img_after TEXT,
     note TEXT,
     request_id TEXT,
+    source TEXT DEFAULT 'store',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -1341,6 +1367,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 -- writes to (running this again is always safe).
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS phone TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS request_id TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'store';
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
