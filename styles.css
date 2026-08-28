@@ -483,6 +483,10 @@ main {
   background: var(--teal-light);
   color: var(--teal);
 }
+.pill.green {
+  background: #e3f7ec;
+  color: #18a66b;
+}
 
 /* Two Columns Layout */
 .two-col {
@@ -616,6 +620,23 @@ main {
   background: var(--primary);
   color: #ffffff;
   border-color: var(--primary);
+}
+
+.wide-btn.current {
+  background: #e3f7ec;
+  color: #18a66b;
+  border-color: #18a66b;
+}
+
+.wide-btn.confirmed {
+  background: #18a66b !important;
+  color: #ffffff !important;
+  border-color: #18a66b !important;
+}
+
+.wide-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 /* Pipeline Tabs */
@@ -1117,9 +1138,9 @@ main {
 }
 
 .step.active i {
-  background: var(--secondary);
-  border-color: var(--secondary);
-  box-shadow: 0 0 0 4px rgba(255, 139, 66, 0.18);
+  background: #18a66b;
+  border-color: #18a66b;
+  box-shadow: 0 0 0 4px rgba(24, 166, 107, 0.18);
 }
 
 .step b {

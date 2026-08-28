@@ -145,13 +145,25 @@ function updateBadges(){
   renderMorningBrief();
 }
 
+// Surfaces database sync failures on screen instead of only in the console.
+// dbInsertJob/dbUpdateJob* calls are fire-and-forget (not awaited by their
+// callers), so without this, a failed save — e.g. a photo too large for one
+// request, a dropped connection — looked identical to a successful one: the
+// job stayed visible locally but silently never reached the other devices.
+function notifyDbError(action, error) {
+  console.error(action, error);
+  if (__shownErrorAlert) return;
+  __shownErrorAlert = true;
+  alert(`Tallennus ei synkronoitunut palvelimelle (${action}).\n\nTyö näkyy tällä laitteella, mutta ei välttämättä muilla, ennen kuin tämä korjaantuu. Tarkista verkkoyhteys ja yritä uudelleen.\n\nVirhe: ${error?.message || error}`);
+}
+
 async function dbInsertJob(j) {
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient.from("jobs").insert([j]);
-      if(error) console.error("Supabase insert job error:", error);
+      if(error) notifyDbError("uuden työn tallennus", error);
     } catch(err) {
-      console.error(err);
+      notifyDbError("uuden työn tallennus", err);
     }
   }
 }
@@ -182,9 +194,9 @@ async function dbUpdateJobStatus(id, status) {
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient.from("jobs").update({ status }).eq("id", id);
-      if(error) console.error("Supabase update job error:", error);
+      if(error) notifyDbError("tilan päivitys", error);
     } catch(err) {
-      console.error(err);
+      notifyDbError("tilan päivitys", err);
     }
   }
 }
@@ -193,9 +205,9 @@ async function dbUpdateJobAfterImage(id, img_after) {
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient.from("jobs").update({ img_after }).eq("id", id);
-      if(error) console.error("Supabase update job after_image error:", error);
+      if(error) notifyDbError("jälkikuvan tallennus", error);
     } catch(err) {
-      console.error(err);
+      notifyDbError("jälkikuvan tallennus", err);
     }
   }
 }
@@ -204,9 +216,9 @@ async function dbUpdateJob(id, fields) {
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient.from("jobs").update(fields).eq("id", id);
-      if(error) console.error("Supabase update job error:", error);
+      if(error) notifyDbError("työn päivitys", error);
     } catch(err) {
-      console.error(err);
+      notifyDbError("työn päivitys", err);
     }
   }
 }
@@ -284,6 +296,30 @@ async function initData(){
 }
 
 const statusLabel={active:"Työn alla",waiting:"Odottaa",ready:"Noudettavissa",late:"Myöhässä",arrived:"Tuote saapui",done:"Luovutettu"};
+function statusPillClass(s){
+  if(s==='late') return 'red';
+  if(s==='waiting'||s==='arrived') return 'orange';
+  if(s==='done') return 'green';
+  return 'teal';
+}
+
+// Real, ordered progress steps for a job — used for both the "Työnkulku"
+// timeline and the "Päivitä tila" picker, so both always agree with the
+// job's actual status instead of a hardcoded/fake set of steps.
+function jobStatusSteps(j){
+  return j.source === "whatsapp"
+    ? [["waiting","Odottaa"],["arrived","Tuote saapui"],["active","Työn alla"],["ready","Valmis noudettavaksi"],["done","Toimitettu"]]
+    : [["waiting","Odottaa"],["active","Työn alla"],["ready","Valmis noudettavaksi"],["done","Luovutettu"]];
+}
+
+function jobTimelineHtml(j){
+  const steps = jobStatusSteps(j);
+  const idx = steps.findIndex(s=>s[0]===j.status);
+  return steps.map((s,i)=>{
+    const reached = idx>=0 && i<=idx;
+    return `<div class="step ${reached?"done":""}"><i></i><div><b>${s[1]}</b></div></div>`;
+  }).join("");
+}
 
 function showPage(id){
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
@@ -315,7 +351,7 @@ document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dat
 function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<small>${statusLabel[j.status]||j.status}</small></div></div>`}
 
 function renderHome(){
-  document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${j.status==='late'?'MYÖHÄSSÄ':j.status==='waiting'?'ODOTTAA':'AKTIIVINEN'}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
+  document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   document.getElementById("today").innerHTML=jobs.slice(0,4).map(jobLine).join("");
   renderMorningBrief();
   renderTodos();
@@ -615,7 +651,7 @@ function renderJobs(){
   let a=jobs.filter(j=>(j.id+j.name+j.product+j.work).toLowerCase().includes(q));
 
   const tableHead = `<div class="table-head"><div>Nro</div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
-  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${j.status==='late'?'red':j.status==='waiting'||j.status==='arrived'?'orange':'teal'}">${statusLabel[j.status]||j.status}</span></div></div>`;
+  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${statusPillClass(j.status)}">${statusLabel[j.status]||j.status}</span></div></div>`;
   const empty = `<p style="text-align:center;color:var(--text-muted);padding:30px 0;">Ei töitä.</p>`;
 
   updateDeliveredStats();
@@ -678,7 +714,6 @@ async function uploadDetailAfterImage(e, id) {
 function openJob(id){
   const j=jobs.find(x=>x.id===id);
   document.getElementById("jobNo").textContent=j.id;
-  const steps = ["Vastaanotettu","Tarkastus","Työn alla","Laadunvalvonta","Valmis noudettavaksi","Luovutettu"];
   
   const trackUrl = `${window.location.origin}/track.html?code=${encodeURIComponent(j.id)}`;
   const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(trackUrl)}`;
@@ -714,7 +749,7 @@ function openJob(id){
         </div>
       </div>
     </div>
-    <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${steps.map((s,i)=>`<div class="step ${i<3?"done":i===3&&j.status==="ready"?"active":""}"><i></i><div><b>${s}</b><small>${i===0?"23.08.2026":i===2?"Nyt":i===4?j.date:""}</small></div></div>`).join("")}</div>
+    <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${jobTimelineHtml(j)}</div>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer" onclick="openStatus('${j.id}')">PÄIVITÄ TILA</button>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--primary-light);color:var(--primary);" onclick="openEditJob('${j.id}')">✏️ MUOKKAA TIETOJA</button>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--teal-light);color:var(--teal);" onclick="addAnotherProductForCustomer('${j.id}')">➕ LISÄÄ UUSI TUOTE TÄLLE ASIAKKAALLE</button>
@@ -772,18 +807,32 @@ function addAnotherProductForCustomer(id){
   openIntake({name:j.name, phone:j.phone});
 }
 
+const statusIcon={waiting:"⏳",arrived:"📦",active:"🔧",ready:"✅",done:"✔"};
+
 function openStatus(id){
   const j=jobs.find(x=>x.id===id);
-  const options = j.source === "whatsapp"
-    ? [["waiting","⏳ Odottaa (tuote ei vielä saapunut)"],["arrived","📦 Tuote saapui"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Toimitettu"]]
-    : [["waiting","⏳ Materiaalia odotetaan"],["active","🔧 Työn alla"],["ready","✅ Valmis noudettavaksi"],["done","✔ Luovutettu"]];
+  const options = jobStatusSteps(j);
   document.getElementById("modalBody").innerHTML=`<h2>Muuta tilaa · ${j.id}</h2><p style="font-size:12px;color:#78858d">${j.name} · ${j.product}${j.source==="whatsapp"?" · 💬 WhatsApp":""}</p>
-<div style="display:grid;gap:7px;margin-top:15px">
-  ${options.map(x=>`<button class="wide-btn" onclick="setStatus('${j.id}','${x[0]}')">${x[1]}</button>`).join("")}
+<div style="display:grid;gap:7px;margin-top:15px" id="statusOptions">
+  ${options.map(x=>{
+    const isCurrent = j.status===x[0];
+    return `<button class="wide-btn status-option${isCurrent?" current":""}" id="statusBtn-${x[0]}" onclick="selectStatus('${j.id}','${x[0]}',this)">${isCurrent?"✓":statusIcon[x[0]]||""} ${x[1]}${isCurrent?" (nykyinen)":""}</button>`;
+  }).join("")}
   <hr style="border:0;border-top:1px solid var(--border);margin:10px 0">
   <button class="wide-btn" style="background:#ef4444;color:white;font-weight:600;" onclick="closeModal();deleteJob('${j.id}');">🗑️ POISTA TÄMÄ TYÖ</button>
 </div>`;
   document.getElementById("modal").classList.remove("hidden");
+}
+
+// Gives instant visual confirmation (button turns green + checkmark) before
+// the modal closes, so it's never unclear whether the tap registered.
+function selectStatus(id,s,btn){
+  document.querySelectorAll("#statusOptions .status-option").forEach(b=>{ b.disabled=true; });
+  if(btn){
+    btn.classList.add("confirmed");
+    btn.textContent = "✓ " + btn.textContent.replace(/^[^\s]+\s*/,"").replace(/\s*\(nykyinen\)$/,"");
+  }
+  setTimeout(()=>setStatus(id,s), 350);
 }
 
 function setStatus(id,s){
@@ -1967,7 +2016,7 @@ function showShelfDetails(shelfCode) {
         <small style="font-size:11px;color:var(--text-muted)">${j.product} (${j.loc})</small>
       </div>
       <div>
-        <span class="pill ${j.status==='late'?'red':j.status==='waiting'?'orange':'teal'}">${statusLabel[j.status] || j.status}</span>
+        <span class="pill ${statusPillClass(j.status)}">${statusLabel[j.status] || j.status}</span>
       </div>
     </div>
   `).join("");
