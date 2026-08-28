@@ -937,6 +937,7 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  cursor: pointer;
 }
 
 .day:hover {
@@ -944,9 +945,13 @@ main {
   box-shadow: var(--shadow-sm);
 }
 
+.day.empty {
+  visibility: hidden;
+  cursor: default;
+}
+
 .day.today {
   border: 2px solid var(--teal);
-  background: var(--teal-light);
 }
 
 .day strong {
@@ -956,17 +961,55 @@ main {
   color: var(--primary);
 }
 
-.dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+/* Job-density coloring: a soft visual guide (not a hard limit) so it's easy
+   to see at a glance which delivery days are already busy — max 6/day is
+   the reference point, not an enforced cap. */
+.day.cal-low { background: #eefaf3; }
+.day.cal-mid { background: #fff8e1; }
+.day.cal-high { background: #fff0e4; }
+.day.cal-over { background: #fde8e8; }
+
+.cal-count {
   align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--teal);
 }
 
-.dot.r { background: #e94b4b; }
-.dot.o { background: var(--secondary); }
-.dot.t { background: var(--teal); }
+.day.cal-low .cal-count { background: #18a66b; }
+.day.cal-mid .cal-count { background: #d9a441; }
+.day.cal-high .cal-count { background: #ce671f; }
+.day.cal-over .cal-count { background: #c93d3d; }
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cal-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
 
 /* Customer grid */
 .customer-grid {

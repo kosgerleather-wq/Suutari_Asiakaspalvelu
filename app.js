@@ -944,7 +944,81 @@ function openNotificationModal(jobId, status) {
   document.getElementById("modal").classList.remove("hidden");
 }
 
-function renderCalendar(){let g=document.getElementById("calGrid"),html="";for(let i=0;i<6;i++)html+='<div class="day"></div>';for(let d=1;d<=31;d++){let count=jobs.filter(j=>j.date.startsWith(String(d).padStart(2,"0")+".")).length;html+=`<div class="day ${d===23?'today':''}"><strong>${d}</strong>${count?`<span class="dot ${count>1?'r':'o'}"></span>`:""}</div>`}g.innerHTML=html}
+const monthNamesFi=["Tammikuu","Helmikuu","Maaliskuu","Huhtikuu","Toukokuu","Kesäkuu","Heinäkuu","Elokuu","Syyskuu","Lokakuu","Marraskuu","Joulukuu"];
+let calendarViewYear, calendarViewMonth;
+(function initCalendarView(){
+  const now = new Date();
+  calendarViewYear = now.getFullYear();
+  calendarViewMonth = now.getMonth();
+})();
+
+function changeCalendarMonth(delta){
+  calendarViewMonth += delta;
+  if(calendarViewMonth < 0){ calendarViewMonth = 11; calendarViewYear--; }
+  if(calendarViewMonth > 11){ calendarViewMonth = 0; calendarViewYear++; }
+  renderCalendar();
+}
+
+// Soft visual guide, not an enforced cap — 6 jobs/day is just the reference
+// point staff asked to see at a glance so a busy day is still pickable.
+function calendarDensityClass(count){
+  if(count<=0) return "";
+  if(count<=2) return "cal-low";
+  if(count<=4) return "cal-mid";
+  if(count<=6) return "cal-high";
+  return "cal-over";
+}
+
+function jobCountsByDate(){
+  const counts = {};
+  jobs.forEach(j=>{ if(j.date) counts[j.date] = (counts[j.date]||0) + 1; });
+  return counts;
+}
+
+function renderCalendar(){
+  const g = document.getElementById("calGrid");
+  const titleEl = document.getElementById("calTitle");
+  if(titleEl) titleEl.textContent = `${monthNamesFi[calendarViewMonth]} ${calendarViewYear}`;
+
+  const firstOfMonth = new Date(calendarViewYear, calendarViewMonth, 1);
+  let leadingBlanks = firstOfMonth.getDay() - 1; // week starts on Monday
+  if(leadingBlanks < 0) leadingBlanks = 6;
+  const daysInMonth = new Date(calendarViewYear, calendarViewMonth+1, 0).getDate();
+  const counts = jobCountsByDate();
+  const now = new Date();
+  const todayStr = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()}`;
+
+  let html = "";
+  for(let i=0;i<leadingBlanks;i++) html += '<div class="day empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${String(d).padStart(2,"0")}.${String(calendarViewMonth+1).padStart(2,"0")}.${calendarViewYear}`;
+    const count = counts[dateStr] || 0;
+    const isToday = dateStr === todayStr;
+    html += `<div class="day ${isToday?"today":""} ${calendarDensityClass(count)}" onclick="openCalendarDay('${dateStr}')"><strong>${d}</strong>${count?`<span class="cal-count">${count}</span>`:""}</div>`;
+  }
+  g.innerHTML = html;
+}
+
+function openCalendarDay(dateStr){
+  const dayJobs = jobs.filter(j=>j.date===dateStr);
+  const count = dayJobs.length;
+  const capacityNote = count>6
+    ? `⚠️ ${count} työtä — yli suositellun 6 työn rajan.`
+    : count===6
+      ? "🔶 6 työtä — suositeltu maksimi täynnä."
+      : `${6-count} paikkaa vapaana suositeltuun 6 työhön asti.`;
+  document.getElementById("modalBody").innerHTML = `<h2>📅 ${dateStr}</h2>
+<p style="font-size:12px;color:#78858d">${count} työtä tälle päivälle · ${capacityNote}</p>
+<div style="display:grid;gap:8px;margin-top:15px;max-height:340px;overflow-y:auto;">
+  ${dayJobs.map(j=>`<div class="wide-btn" style="text-align:left;cursor:pointer;" onclick="closeModal();openJob('${j.id}')">
+    <b>${j.id} · ${j.name}</b><br><small>${j.product} · ${j.work} · <span class="pill ${statusPillClass(j.status)}" style="margin-left:4px;">${statusLabel[j.status]||j.status}</span></small>
+  </div>`).join("") || '<p style="color:var(--text-muted);font-size:13px;">Ei töitä tälle päivälle. Voit vapaasti antaa tämän päivän asiakkaalle.</p>'}
+</div>
+<div class="modal-actions" style="margin-top:15px;">
+  <button class="cancel" onclick="closeModal()">Sulje</button>
+</div>`;
+  document.getElementById("modal").classList.remove("hidden");
+}
 
 function renderCustomers(){
   const customerMap = {};

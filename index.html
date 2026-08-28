@@ -242,14 +242,20 @@
   </div>
   <div class="calendar card">
     <div class="cal-head">
-      <button>‹</button>
-      <h2>Elokuu 2026</h2>
-      <button>›</button>
+      <button onclick="changeCalendarMonth(-1)">‹</button>
+      <h2 id="calTitle">Elokuu 2026</h2>
+      <button onclick="changeCalendarMonth(1)">›</button>
     </div>
     <div class="week">
       <b>Ma</b><b>Ti</b><b>Ke</b><b>To</b><b>Pe</b><b>La</b><b>Su</b>
     </div>
     <div id="calGrid" class="cal-grid"></div>
+    <div class="cal-legend">
+      <span><i style="background:#18a66b"></i>1–2 työtä</span>
+      <span><i style="background:#d9a441"></i>3–4 työtä</span>
+      <span><i style="background:#ce671f"></i>5–6 työtä (suositeltu maksimi)</span>
+      <span><i style="background:#c93d3d"></i>7+ työtä</span>
+    </div>
   </div>
 </section>
 
@@ -684,6 +690,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260828_2200"></script>
+<script src="app.js?v=20260828_2300"></script>
 </body>
 </html>
