@@ -326,6 +326,7 @@ main {
   box-shadow: var(--shadow-sm);
   border-top: 4px solid var(--border-color);
   transition: var(--transition);
+  cursor: pointer;
 }
 
 .stat:hover {

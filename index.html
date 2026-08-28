@@ -132,11 +132,11 @@
   </div>
 
   <div class="stats">
-    <div class="stat red"><small>Toimenpiteitä tarvitaan</small><strong id="statActionsNeeded">0</strong><span>Tänään</span></div>
-    <div class="stat orange"><small>Toimitus tänään</small><strong id="statDueToday">0</strong><span>2 tunnin sisällä</span></div>
-    <div class="stat blue"><small>Verstaalla</small><strong id="statInProgress">0</strong><span>Työn alla</span></div>
-    <div class="stat teal"><small>Valmis</small><strong id="statReady">0</strong><span>Asiakasta odotetaan</span></div>
-    <div class="stat purple"><small>WhatsApp odottaa</small><strong id="statNewMsg">0</strong><span>Tuote ei vielä saapunut</span></div>
+    <div class="stat red" onclick="goHomeStat('needs-action')"><small>Toimenpiteitä tarvitaan</small><strong id="statActionsNeeded">0</strong><span>Tänään</span></div>
+    <div class="stat orange" onclick="goHomeStat('today')"><small>Toimitus tänään</small><strong id="statDueToday">0</strong><span>2 tunnin sisällä</span></div>
+    <div class="stat blue" onclick="goHomeStat('active')"><small>Verstaalla</small><strong id="statInProgress">0</strong><span>Työn alla</span></div>
+    <div class="stat teal" onclick="goHomeStat('ready')"><small>Valmis</small><strong id="statReady">0</strong><span>Asiakasta odotetaan</span></div>
+    <div class="stat purple" onclick="goHomeStat('whatsapp-waiting')"><small>WhatsApp odottaa</small><strong id="statNewMsg">0</strong><span>Tuote ei vielä saapunut</span></div>
   </div>
 
   <div class="section-title">
@@ -228,6 +228,7 @@
       <button onclick="setJobFilter('done', this)">✔ Teslim edildi</button>
     </div>
   </div>
+  <p id="jobsFilterNote" style="font-size:12px;color:var(--primary);font-weight:600;margin:0 0 8px;"></p>
   <p id="deliveredStats" style="font-size:12px;color:var(--text-muted);font-weight:600;margin:0 0 12px;"></p>
   <div class="table-card" id="jobsTable"></div>
 </section>
@@ -690,6 +691,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260828_2300"></script>
+<script src="app.js?v=20260829_0000"></script>
 </body>
 </html>

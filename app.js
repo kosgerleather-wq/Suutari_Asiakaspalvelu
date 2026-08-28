@@ -655,7 +655,34 @@ function setJobFilter(filter, btn) {
   currentJobFilter = filter;
   document.querySelectorAll("#jobs .chips button").forEach(x => x.classList.remove("active"));
   btn.classList.add("active");
+  setJobsFilterNote("");
   renderJobs();
+}
+
+function setJobsFilterNote(text) {
+  const el = document.getElementById("jobsFilterNote");
+  if (el) el.innerHTML = text;
+}
+
+// Makes the "Tänään" home page stat cards clickable shortcuts into the
+// filtered Työt view they summarize, instead of being static numbers.
+const HOME_STAT_NOTES = {
+  "needs-action": "⚠️ Toimenpiteitä tarvitaan: myöhässä olevat työt ja odottavat WhatsApp-tilaukset.",
+  "today": "📦 Tänään toimitettavat työt.",
+  "active": "🔧 Verstaalla: työn alla olevat (ja myöhässä olevat) työt.",
+  "ready": "✅ Valmiit, asiakasta odottavat työt.",
+  "whatsapp-waiting": "💬 WhatsApp-tilaukset, jotka odottavat tuotteen saapumista."
+};
+function goHomeStat(type) {
+  currentJobFilter = type;
+  const chipIndexByFilter = { all: 0, active: 1, waiting: 2, ready: 3, done: 4 };
+  const chipButtons = document.querySelectorAll("#jobs .chips button");
+  chipButtons.forEach(b => b.classList.remove("active"));
+  const chipIdx = chipIndexByFilter[type];
+  if (chipIdx != null && chipButtons[chipIdx]) chipButtons[chipIdx].classList.add("active");
+  const note = HOME_STAT_NOTES[type] || "";
+  setJobsFilterNote(note ? `${note} <a href="#" onclick="setJobFilter('all', document.querySelector('#jobs .chips button')); return false;" style="color:var(--teal);">Näytä kaikki</a>` : "");
+  showPage("jobs");
 }
 
 function parseFinDate(str){
@@ -712,6 +739,21 @@ function renderJobs(){
   }
   if(currentJobFilter === "ready"){
     a = a.filter(j => j.status === "ready");
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "needs-action"){
+    a = a.filter(j => j.status === "late" || (j.source === "whatsapp" && j.status === "waiting"));
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "today"){
+    a = a.filter(j => j.date === todayDateStr());
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "whatsapp-waiting"){
+    a = a.filter(j => j.source === "whatsapp" && j.status === "waiting");
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
