@@ -719,7 +719,7 @@ function openJob(id){
           <span style="position:absolute;bottom:4px;left:4px;background:rgba(15,45,74,0.85);color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">ENNEN</span>
         </div>
         <div style="position:relative;cursor:pointer;" onclick="document.getElementById('detailAfterFile').click()">
-          <img src="${j.img_after || 'bag.png'}" id="detailAfterPreview" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;opacity:${j.img_after ? 1 : 0.4};">
+          <img src="${j.img_after || bag}" id="detailAfterPreview" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;opacity:${j.img_after ? 1 : 0.4};">
           <span style="position:absolute;bottom:4px;left:4px;background:rgba(16,185,129,0.85);color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">JÄLKEEN</span>
           <input type="file" id="detailAfterFile" accept="image/*" style="display:none" onchange="uploadDetailAfterImage(event, '${j.id}')">
         </div>
@@ -1498,7 +1498,7 @@ function loadJobForSocial() {
   const j = jobs.find(x => x.id === jobId);
   if (!j) return;
   
-  document.getElementById("beforeImgPreview").src = j.img || "bag.png";
+  document.getElementById("beforeImgPreview").src = j.img || bag;
   
   const afterPreview = document.getElementById("afterImgPreview");
   const afterDropText = document.getElementById("afterDropText");
@@ -1607,8 +1607,8 @@ function combineImages() {
   const j = jobs.find(x => x.id === jobId);
   if (!j) return;
   
-  const beforeSrc = j.img || "bag.png";
-  const afterSrc = afterImageBase64 || "bag.png";
+  const beforeSrc = j.img || bag;
+  const afterSrc = afterImageBase64 || bag;
   
   const canvas = document.getElementById("combinedCanvas");
   const ctx = canvas.getContext("2d");
