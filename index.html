@@ -88,7 +88,6 @@
     <button class="active" data-page="home">⌂ <span>Tänään</span></button>
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
-    <button data-page="shelves">◰ <span>Hyllykartta</span></button>
     <button data-page="social">📢 <span>Sosiaalinen Media</span></button>
     <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
     <button data-page="customers">♙ <span>Asiakkaat</span></button>
@@ -402,39 +401,36 @@
         <option value="all">Kaikki kanavat</option>
         <option value="store">Myymälä</option>
         <option value="whatsapp">WhatsApp</option>
-        <option value="email">Sähköposti</option>
-        <option value="post">Posti</option>
       </select>
     </label>
     <label>Tila
       <select id="exportStatus">
         <option value="all">Kaikki tilat</option>
-        <option value="new">Uusi</option>
-        <option value="answered">Vastattu</option>
-        <option value="bring">Asiakas tuo</option>
+        <option value="waiting">Odottaa</option>
         <option value="arrived">Tuote saapui</option>
-        <option value="converted">Työn alla</option>
+        <option value="active">Työn alla</option>
+        <option value="late">Myöhässä</option>
         <option value="ready">Valmis</option>
-        <option value="delivered">Luovutettu</option>
+        <option value="done">Luovutettu</option>
       </select>
     </label>
   </div>
 
   <div class="stats-grid">
     <div class="stat-card">
-      <span>Yhteensä kyselyitä</span>
+      <span>Yhteensä töitä</span>
       <strong id="rTotal">0</strong>
-      <small>Kaikki saapuneet kyselyt</small>
+      <small>Kaikki vastaanotetut työt</small>
     </div>
     <div class="stat-card">
-      <span>Työksi muutettu</span>
+      <span>Luovutettu</span>
       <strong id="rConverted">0</strong>
-      <small id="rConversion">0% konversio</small>
+      <small id="rConversion">0% toimitettu</small>
     </div>
     <div class="stat-card">
-      <span>Odottavat kyselyt</span>
+      <span>Kesken</span>
       <strong id="rPending">0</strong>
-      <small>Odottaa konversiota</small>
+      <small>Ei vielä luovutettu</small>
     </div>
     <div class="stat-card">
       <span>Kokonaistuotto</span>
@@ -446,14 +442,14 @@
   <div class="report-grid">
     <div class="panel">
       <div class="panel-head">
-        <h2>Kyselyt kanavittain</h2>
+        <h2>Työt kanavittain</h2>
         <span>Kanavajakauma</span>
       </div>
       <div id="sourceStats"></div>
     </div>
     <div class="panel">
       <div class="panel-head">
-        <h2>Kyselyiden tilajakauma</h2>
+        <h2>Töiden tilajakauma</h2>
         <span>Vaiheet</span>
       </div>
       <div id="statusStats"></div>
@@ -463,21 +459,20 @@
   <div class="panel data-panel">
     <div class="panel-head">
       <h2>Datan esikatselu</h2>
-      <span id="previewCount">0 tilausta</span>
+      <span id="previewCount">0 työtä</span>
     </div>
     <div class="table-wrap">
       <table class="data-table">
         <thead>
           <tr>
-            <th>Kysely ID</th>
-            <th>Kanava</th>
-            <th>Asiakas ID</th>
+            <th>Työ ID</th>
+            <th>Lähde</th>
+            <th>Asiakas</th>
             <th>Päivämäärä</th>
             <th>Tuote</th>
             <th>Korjaus</th>
             <th>Tila</th>
             <th>Hinta</th>
-            <th>Työtilaus ID</th>
           </tr>
         </thead>
         <tbody id="exportTable"></tbody>
@@ -689,6 +684,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260828_0400"></script>
+<script src="app.js?v=20260828_1500"></script>
 </body>
 </html>

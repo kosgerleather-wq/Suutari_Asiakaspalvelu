@@ -1300,28 +1300,41 @@ function makeRequestId(source){requestSeq[source]=(requestSeq[source]||0)+1;retu
 function makeCustomerId(){customerSeq++;return `C-2026-${String(customerSeq).padStart(6,"0")}`}
 function makeJobId(){jobSeq++;return `J-2026-${String(jobSeq).padStart(6,"0")}`}
 function normalizeRequests(){requests.forEach(r=>{r.source=r.source||"whatsapp";r.request_id=r.request_id||makeRequestId(r.source);r.customer_id=r.customer_id||makeCustomerId();r.created_at=r.created_at||"2026-08-24";if(r.status==="converted"&&!r.job_id)r.job_id=makeJobId();if(r.price===undefined)r.price=""})}
-function getExportData(){let f=document.getElementById("exportFrom")?.value||"",t=document.getElementById("exportTo")?.value||"",s=document.getElementById("exportSource")?.value||"all",st=document.getElementById("exportStatus")?.value||"all";return requests.filter(r=>(!f||(r.created_at||"")>=f)&&(!t||(r.created_at||"")<=t)&&(s==="all"||r.source===s)&&(st==="all"||r.status===st))}
-
-function renderReports(){
-  normalizeRequests();
-  let d=getExportData(),total=requests.length,conv=requests.filter(r=>r.job_id).length,rev=requests.reduce((a,r)=>a+(Number(r.price)||0),0);
-  document.getElementById("rTotal").textContent=total;
-  document.getElementById("rConverted").textContent=conv;
-  document.getElementById("rPending").textContent=total-conv;
-  document.getElementById("rConversion").textContent=(total?Math.round(conv/total*100):0)+"% konversio";
-  document.getElementById("rRevenue").textContent="€"+rev;
-  
-  let src=document.getElementById("sourceStats"),mx=Math.max(1,...Object.keys(SOURCE_META).map(s=>requests.filter(r=>r.source===s).length));
-  src.innerHTML=Object.keys(SOURCE_META).map(s=>{let n=requests.filter(r=>r.source===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");
-  
-  let sts=[["new","Uusi"],["answered","Vastattu"],["bring","Asiakas tuo"],["arrived","Tuote saapui"],["converted","Työn alla"],["ready","Valmis"],["delivered","Luovutettu"]],sm=Math.max(1,...sts.map(x=>requests.filter(r=>r.status===x[0]).length));
-  document.getElementById("statusStats").innerHTML=sts.map(x=>{let n=requests.filter(r=>r.status===x[0]).length;return `<div class="status-row"><span>${x[1]}</span><div class="bar"><i style="width:${n/sm*100}%"></i></div><b>${n}</b></div>`}).join("");
-  
-  document.getElementById("exportTable").innerHTML=d.map(r=>`<tr><td>${r.request_id}</td><td><span class="source-pill">${SOURCE_META[r.source]?.icon||""} ${SOURCE_META[r.source]?.label||r.source}</span></td><td>${r.customer_id||""}</td><td>${r.created_at||""}</td><td>${r.product||""}</td><td>${r.work||""}</td><td><span class="status-pill">${r.status||""}</span></td><td>${r.price!==""&&r.price!=null?"€"+r.price:""}</td><td>${r.job_id||"—"}</td></tr>`).join("")||'<tr><td colspan="9" class="empty-row">Ei hakuehtoja vastaavia tietoja.</td></tr>';
-  document.getElementById("previewCount").textContent=d.length+" tilausta";
+function jobCreatedDateStr(j){
+  // created_at comes back from Supabase as an ISO timestamp; fall back to
+  // the delivery date for jobs that haven't synced yet.
+  if(j.created_at) return String(j.created_at).slice(0,10);
+  const d = parseFinDate(j.date);
+  return d ? d.toISOString().slice(0,10) : "";
 }
 
-function csvRows(){let d=getExportData();return [["Request ID","Source","Customer ID","Date","Product","Service","Status","Price","Job ID"],...d.map(r=>[r.request_id,r.source,r.customer_id,r.created_at,r.product,r.work,r.status,r.price,r.job_id||""])]}
+function getExportData(){
+  let f=document.getElementById("exportFrom")?.value||"",t=document.getElementById("exportTo")?.value||"",s=document.getElementById("exportSource")?.value||"all",st=document.getElementById("exportStatus")?.value||"all";
+  return jobs.filter(j=>{
+    const created = jobCreatedDateStr(j);
+    return (!f||created>=f)&&(!t||created<=t)&&(s==="all"||j.source===s||(s==="store"&&!j.source))&&(st==="all"||j.status===st);
+  });
+}
+
+function renderReports(){
+  let d=getExportData(),total=jobs.length,delivered=jobs.filter(j=>j.status==="done").length,rev=jobs.reduce((a,j)=>a+(Number(j.price)||0),0);
+  document.getElementById("rTotal").textContent=total;
+  document.getElementById("rConverted").textContent=delivered;
+  document.getElementById("rPending").textContent=total-delivered;
+  document.getElementById("rConversion").textContent=(total?Math.round(delivered/total*100):0)+"% toimitettu";
+  document.getElementById("rRevenue").textContent="€"+rev;
+
+  let src=document.getElementById("sourceStats"),sourceKeys=["store","whatsapp"],mx=Math.max(1,...sourceKeys.map(s=>jobs.filter(j=>(j.source||"store")===s).length));
+  src.innerHTML=sourceKeys.map(s=>{let n=jobs.filter(j=>(j.source||"store")===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");
+
+  let sts=[["waiting","Odottaa"],["arrived","Tuote saapui"],["active","Työn alla"],["late","Myöhässä"],["ready","Valmis"],["done","Luovutettu"]],sm=Math.max(1,...sts.map(x=>jobs.filter(j=>j.status===x[0]).length));
+  document.getElementById("statusStats").innerHTML=sts.map(x=>{let n=jobs.filter(j=>j.status===x[0]).length;return `<div class="status-row"><span>${x[1]}</span><div class="bar"><i style="width:${n/sm*100}%"></i></div><b>${n}</b></div>`}).join("");
+
+  document.getElementById("exportTable").innerHTML=d.map(j=>`<tr><td>${j.id}</td><td><span class="source-pill">${SOURCE_META[j.source||"store"]?.icon||""} ${SOURCE_META[j.source||"store"]?.label||j.source}</span></td><td>${j.name||""}</td><td>${jobCreatedDateStr(j)}</td><td>${j.product||""}</td><td>${j.work||""}</td><td><span class="status-pill">${statusLabel[j.status]||j.status||""}</span></td><td>${j.price!==""&&j.price!=null?"€"+j.price:""}</td></tr>`).join("")||'<tr><td colspan="8" class="empty-row">Ei hakuehtoja vastaavia tietoja.</td></tr>';
+  document.getElementById("previewCount").textContent=d.length+" työtä";
+}
+
+function csvRows(){let d=getExportData();return [["Työ ID","Lähde","Asiakas","Päivämäärä","Tuote","Korjaus","Tila","Hinta"],...d.map(j=>[j.id,SOURCE_META[j.source||"store"]?.label||j.source,j.name,jobCreatedDateStr(j),j.product,j.work,statusLabel[j.status]||j.status,j.price])]}
 function exportCSV(){let rows=csvRows(),csv="\uFEFF"+rows.map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="tehtaankatu_suutari_export.csv";a.click()}
 function exportExcel(){let rows=csvRows(),table="<table><tr>"+rows[0].map(x=>`<th>${x}</th>`).join("")+"</tr>"+rows.slice(1).map(r=>"<tr>"+r.map(x=>`<td>${x??""}</td>`).join("")+"</tr>").join("")+"</table>",a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff<html><meta charset='UTF-8'><body>"+table+"</body></html>"],{type:"application/vnd.ms-excel"}));a.download="tehtaankatu_suutari_export.xls";a.click()}
 ["exportFrom","exportTo","exportSource","exportStatus"].forEach(id=>document.getElementById(id)?.addEventListener("change",renderReports));
