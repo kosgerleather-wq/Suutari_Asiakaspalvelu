@@ -103,7 +103,7 @@
   <div class="mobile-brand">TEHTAANKATU SUUTARI</div>
   <div class="top-right">
     <span>23.08.2026</span>
-    <button>🔔</button>
+    <button onclick="goHomeStat('needs-action')" title="Toimenpiteitä tarvitaan">🔔<span id="notifBadge" class="notif-badge" style="display:none;">0</span></button>
     <div class="avatar">S</div>
   </div>
 </header>
@@ -166,47 +166,6 @@
       </div>
     </div>
   </div>
-</section>
-
-<section id="inbox" class="page">
-  <div class="hero">
-    <div>
-      <div class="eyebrow">WhatsApp · Inbox</div>
-      <div class="wa-title-row">
-        <div><h1>WhatsApp</h1></div>
-        <button class="import-main" onclick="openImportModal()">📥 Tuo WhatsAppista</button>
-      </div>
-      <p>Hallitse koko prosessia asiakasviestistä työtilaukseen yhdeltä näytöltä.</p>
-    </div>
-    <button class="quick-add" onclick="openRequestForm()">＋ UUSI PYYNTÖ</button>
-  </div>
-  
-  <div class="pipeline">
-    <span class="on">Uusi <b id="pipelineNew">0</b></span>
-    <span>Vastattu <b id="pipelineAnswered">0</b></span>
-    <span>Asiakas tuo <b id="pipelineBring">0</b></span>
-    <span>Tuote saapui <b id="pipelineArrived">0</b></span>
-    <span>Työn alla <b id="pipelineConverted">0</b></span>
-  </div>
-  
-  <div class="whatsapp-shell">
-    <div class="chat-list">
-      <div class="chat-search">⌕ <input id="chatSearch" placeholder="Etsi asiakasta tai tuotetta..." oninput="renderWhatsappV5()"></div>
-      <div id="chatList"></div>
-    </div>
-    <div class="chat-window" id="chatWindow">
-      <div class="empty-chat">
-        <div class="wa-icon">◉</div>
-        <h2>Valitse asiakas</h2>
-        <p>Seuraa keskustelua, kyselyn tilaa ja työn tietoja samalta näytöltä.</p>
-      </div>
-    </div>
-    <aside class="chat-side" id="chatSide">
-      <div class="side-empty">Asiakkaan tiedot näkyvät tässä kun hänet on valittu.</div>
-    </aside>
-  </div>
-  <div class="kanban-mobile-note">Kanban-näkymä on saatavilla alla.</div>
-  <div class="kanban" id="kanban"></div>
 </section>
 
 <section id="jobs" class="page">
@@ -625,72 +584,7 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="importModal" style="display:none">
-  <div class="import-modal">
-    <button class="modal-close" onclick="closeImportModal()">×</button>
-    <div class="eyebrow">MANUAALINEN TUONTI</div>
-    <h2>Lisää WhatsApp-keskustelu</h2>
-    <p class="import-intro">Lataa kuvakaappaus tai liitä viesti luodaksesi uuden asiakaskyselyn.</p>
-    <div class="import-tabs">
-      <button class="itab active" onclick="setImportTab('image',this)">📷 Kuvakaappaus</button>
-      <button class="itab" onclick="setImportTab('text',this)">📋 Liitä viesti</button>
-    </div>
-    
-    <div id="imageImport">
-      <label class="dropzone" id="dropzone">
-        <input type="file" accept="image/*" onchange="previewImportImage(event)">
-        <div id="dropContent">
-          <strong>📷 Valitse kuva tai raahaa se tähän</strong>
-          <span>WhatsApp-kuvakaappaus tai asiakkaan tuotteen kuva</span>
-        </div>
-        <img id="importPreview" style="display:none">
-      </label>
-      <div class="import-hint">Demossa kuva esikatsellaan. Voit muokata ja tallentaa lomakkeen klikkaamalla "Poimi tiedot".</div>
-      <button class="analyze-btn" onclick="showExtracted()">✨ Poimi tiedot</button>
-    </div>
-    
-    <div id="textImport" style="display:none">
-      <textarea id="pasteMessage" placeholder="Esimerkki: Hei! Voiko tämän laukun vetoketjun korjata? Paljonko maksaa?"></textarea>
-      <button class="analyze-btn" onclick="extractFromText()">✨ Poimi tiedot viestistä</button>
-    </div>
-    
-    <div class="extracted" id="extracted" style="display:none">
-      <div class="extract-head"><b>✓ Poimitut tiedot</b><span>Voit muokata ennen tallennusta</span></div>
-      <div class="extract-grid">
-        <label>Asiakas<input id="exName" placeholder="Asiakkaan nimi"></label>
-        <label>Puhelin<input id="exPhone" placeholder="Esim. 0401234567"></label>
-        <label>Tuote<input id="exProduct" list="tuoteOptions" placeholder="Esim. Käsilaukku"></label>
-        <label>Korjaus / ongelma<input id="exWork" list="korjausOptions" placeholder="Esim. Vetoketjun korjaus"></label>
-        <label>Arvioitu hinta (€)<input id="exPrice" type="number" placeholder="45"></label>
-        <label>Tila
-          <select id="exStatus">
-            <option value="new">🟠 Uusi kysely</option>
-            <option value="answered">💬 Vastattu</option>
-            <option value="bring">📅 Asiakas tuo</option>
-          </select>
-        </label>
-      </div>
-      <label class="full-label">Asiakkaan viesti<textarea id="exMessage"></textarea></label>
-      <label class="full-label" style="margin-top:10px;">Ehdotettu WhatsApp-vastaus (Suomi)<textarea id="exReplyText" style="height:110px;"></textarea></label>
-      
-      <div style="display:flex; gap:10px; margin-top:15px;">
-        <button class="save" onclick="sendWhatsAppReply()" style="background:#25d366; color:white; border:0; display:flex; align-items:center; justify-content:center; gap:6px; flex:1; padding:12px; border-radius:9px; font-weight:700; cursor:pointer;">
-          💬 Vastaa WhatsAppilla
-        </button>
-        <button class="save" onclick="convertRequestToJob()" style="background:var(--primary); color:white; border:0; display:flex; align-items:center; justify-content:center; gap:6px; flex:1; padding:12px; border-radius:9px; font-weight:700; cursor:pointer;">
-          🔧 Luo Työ (Kabul)
-        </button>
-      </div>
-      
-      <div class="extract-actions" style="margin-top:15px; border-top:1px solid var(--border-color); padding-top:15px;">
-        <button class="cancel-small" onclick="closeImportModal()">Peruuta</button>
-        <button class="save-import" onclick="saveImportedRequest()">Tallenna vain kyselynä</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260829_0000"></script>
+<script src="app.js?v=20260829_0100"></script>
 </body>
 </html>

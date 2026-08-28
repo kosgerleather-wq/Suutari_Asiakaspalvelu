@@ -278,6 +278,7 @@ async function getJobDetails(code) {
 const statusLabel = {
   active: "Työn alla",
   waiting: "Odottaa materiaalia",
+  arrived: "Tuote saapui",
   ready: "Valmis noudettavaksi",
   late: "Myöhässä",
   done: "Luovutettu asiakkaalle"
@@ -307,7 +308,7 @@ async function trackJob() {
   
   const pill = document.getElementById("resStatusPill");
   pill.textContent = statusLabel[j.status] || j.status;
-  pill.className = "status-pill " + (j.status === "late" ? "red" : j.status === "waiting" ? "orange" : "teal");
+  pill.className = "status-pill " + (j.status === "late" ? "red" : (j.status === "waiting" || j.status === "arrived") ? "orange" : "teal");
   
   // Render timeline steps
   const steps = [
@@ -317,9 +318,12 @@ async function trackJob() {
     { label: "Luovutettu asiakkaalle", status: j.status === "done" ? "done" : "pending" }
   ];
   
-  // Special exception for material waiting
+  // Special exception for material waiting / WhatsApp orders whose product
+  // has arrived at the shop but work hasn't started yet
   if (j.status === "waiting") {
     steps[1] = { label: "Odottaa materiaalia", status: "active" };
+  } else if (j.status === "arrived") {
+    steps[1] = { label: "Tuote saapui, työ alkaa pian", status: "active" };
   }
   
   document.getElementById("timeline").innerHTML = steps.map(s => `

@@ -53,12 +53,7 @@ async function uploadJobImage(file, jobId, tag) {
 }
 
 let jobs=[];
-let requests=[];
-let requestSeq={store:146,whatsapp:87,email:33,post:20};
-let customerSeq=421;
-let jobSeq=153;
 let jobIdSeq=1053;
-let activeConvertingRequestId=null;
 let todos=[];
 
 let supabaseClient = null;
@@ -121,10 +116,8 @@ function saveState(){
   // strip the heavy image fields from what gets cached; the DB keeps them.
   try {
     const lightJobs = jobs.map(({img, img_after, ...rest}) => rest);
-    const lightRequests = requests.map(({img, ...rest}) => rest);
     localStorage.setItem("suutari_jobs", JSON.stringify(lightJobs));
-    localStorage.setItem("suutari_requests", JSON.stringify(lightRequests));
-    localStorage.setItem("suutari_seqs", JSON.stringify({requestSeq,customerSeq,jobSeq,jobIdSeq}));
+    localStorage.setItem("suutari_seqs", JSON.stringify({jobIdSeq}));
     localStorage.setItem("suutari_todos", JSON.stringify(todos));
   } catch (err) {
     console.error("Local cache save failed (data is still saved to the database):", err);
@@ -138,11 +131,6 @@ function todayDateStr(){
 }
 
 function updateBadges(){
-  const newRequests = requests.filter(r=>r.status==="new").length;
-  const answeredRequests = requests.filter(r=>r.status==="answered").length;
-  const bringRequests = requests.filter(r=>r.status==="bring").length;
-  const arrivedRequests = requests.filter(r=>r.status==="arrived").length;
-  const convertedRequests = requests.filter(r=>r.status==="converted").length;
   const lateJobs = jobs.filter(j=>j.status==="late").length;
   const activeJobs = jobs.filter(j=>j.status==="active").length;
   const readyJobs = jobs.filter(j=>j.status==="ready").length;
@@ -151,17 +139,19 @@ function updateBadges(){
   const whatsappWaiting = jobs.filter(j=>j.source==="whatsapp" && j.status==="waiting").length;
 
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
-  set("statActionsNeeded", lateJobs + whatsappWaiting);
+  const actionsNeeded = lateJobs + whatsappWaiting;
+  set("statActionsNeeded", actionsNeeded);
   set("statDueToday", dueTodayJobs);
   set("statInProgress", activeJobs);
   set("statReady", readyJobs);
   set("statNewMsg", whatsappWaiting);
   set("todayCount", `${todayListCount} työtä`);
-  set("pipelineNew", newRequests);
-  set("pipelineAnswered", answeredRequests);
-  set("pipelineBring", bringRequests);
-  set("pipelineArrived", arrivedRequests);
-  set("pipelineConverted", convertedRequests);
+
+  const badge = document.getElementById("notifBadge");
+  if (badge) {
+    badge.textContent = actionsNeeded > 99 ? "99+" : actionsNeeded;
+    badge.style.display = actionsNeeded > 0 ? "flex" : "none";
+  }
   renderMorningBrief();
 }
 
@@ -193,17 +183,6 @@ async function dbDeleteJob(id) {
     try {
       const { error } = await supabaseClient.from("jobs").delete().eq("id", id);
       if(error) console.error("Supabase delete job error:", error);
-    } catch(err) {
-      console.error(err);
-    }
-  }
-}
-
-async function dbDeleteRequest(id) {
-  if (supabaseClient) {
-    try {
-      const { error } = await supabaseClient.from("requests").delete().eq("id", id);
-      if(error) console.error("Supabase delete request error:", error);
     } catch(err) {
       console.error(err);
     }
@@ -243,27 +222,13 @@ async function dbUpdateJob(id, fields) {
   }
 }
 
-async function dbUpsertRequest(r) {
-  if (supabaseClient) {
-    try {
-      const { error } = await supabaseClient.from("requests").upsert([r]);
-      if(error) console.error("Supabase upsert request error:", error);
-    } catch(err) {
-      console.error(err);
-    }
-  }
-}
-
 async function syncFromDb() {
   if(!supabaseClient) return false;
   try {
     const { data: jobData, error: jobErr } = await supabaseClient.from("jobs").select("*").order("created_at", { ascending: false });
     if(jobErr) throw jobErr;
-    const { data: reqData, error: reqErr } = await supabaseClient.from("requests").select("*");
-    if(reqErr) throw reqErr;
 
     jobs = jobData || [];
-    requests = reqData || [];
     saveState();
     return true;
   } catch(err) {
@@ -274,21 +239,15 @@ async function syncFromDb() {
 
 async function initData(){
   const storedJobs=localStorage.getItem("suutari_jobs");
-  const storedRequests=localStorage.getItem("suutari_requests");
   const storedSeqs=localStorage.getItem("suutari_seqs");
-  if(storedJobs && storedRequests){
+  if(storedJobs){
     jobs=JSON.parse(storedJobs);
-    requests=JSON.parse(storedRequests);
     if(storedSeqs){
       const seqs=JSON.parse(storedSeqs);
-      requestSeq=seqs.requestSeq||requestSeq;
-      customerSeq=seqs.customerSeq||customerSeq;
-      jobSeq=seqs.jobSeq||jobSeq;
       jobIdSeq=seqs.jobIdSeq||1053;
     }
   }else{
     jobs=[];
-    requests=[];
   }
 
   const storedTodos = localStorage.getItem("suutari_todos");
@@ -347,7 +306,6 @@ function showPage(id){
   document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));
   scrollTo({top:0,behavior:"smooth"});
   if(id==="jobs")renderJobs();
-  if(id==="inbox")renderInbox();
   if(id==="calendar")renderCalendar();
   if(id==="customers")renderCustomers();
   if(id==="reports")renderReports();
@@ -376,46 +334,6 @@ function renderHome(){
   renderMorningBrief();
   renderTodos();
   updateBadges();
-}
-
-function renderInbox(){
-  const groups=[["new","Uusi"],["answered","Vastattu"],["bring","Asiakas tuo"],["arrived","Tuote saapui"],["converted","Työn alla"]];
-  document.getElementById("kanban").innerHTML=groups.map(g=>{let a=requests.filter(r=>r.status===g[0]);return `<div class="column"><div class="column-head"><span>${g[1]}</span><b>${a.length}</b></div>${a.map(r=>`<div class="request" onclick="openRequest(${r.id})"><img src="${r.img}"><b>${r.name}</b><p>${r.msg}</p><span class="pill ${g[0]==='new'?'orange':g[0]==='bring'?'teal':'blue'}">${r.work}</span></div>`).join("")}</div>`}).join("");
-}
-
-function openRequest(id){
-  const r=requests.find(x=>x.id===id);
-  document.getElementById("modalBody").innerHTML=`<h2>${r.name}</h2><p style="color:#78858d;font-size:12px">${r.product} · ${r.work}</p><div class="detail-grid" style="margin-top:15px"><div><img src="${r.img}" style="width:100%;height:180px;object-fit:cover;border-radius:11px"><div class="card" style="margin-top:10px"><b style="font-size:11px">Asiakkaan viesti</b><p style="font-size:12px;line-height:1.5">${r.msg}</p><b style="font-size:11px">Vastauksesi</b><p style="font-size:12px;color:#60747d">${r.reply||"Ei vielä vastattu."}</p></div></div><div class="detail"><b style="font-size:11px">Kyselyn tila</b><div class="timeline"><div class="step done"><i></i><div><b>Kysely saapui</b><small>WhatsApp</small></div></div><div class="step ${r.status!=='new'?'done':''}"><i></i><div><b>Vastattu</b><small>Arvio / hinta annettu</small></div></div><div class="step ${r.status==='bring'||r.status==='arrived'?'done':''}"><i></i><div><b>Asiakas tuo</b><small>Seuranta</small></div></div><div class="step ${r.status==='arrived'?'active':''}"><i></i><div><b>Tuote saapui</b><small>Valmis työtilaukseksi</small></div></div></div></div></div><div class="modal-actions"><button class="cancel" onclick="closeModal()">Sulje</button><button class="save" onclick="convertRequest(${r.id})">📦 TUOTE SAAPUI → LUO TYÖ</button></div>`;
-  document.getElementById("modal").classList.remove("hidden");
-}
-
-function convertRequest(id){
-  let r=requests.find(x=>x.id===id);
-  activeConvertingRequestId = r.id;
-  r.status="converted";
-  saveState();
-  dbUpsertRequest(r);
-  closeModal();
-  openIntake(r);
-}
-
-function openRequestForm(){
-  document.getElementById("modalBody").innerHTML=`<h2>Uusi asiakastiedustelu</h2><p style="font-size:12px;color:#78858d">Tallenna WhatsApp-kysely nopeasti.</p><div class="form"><div class="field"><label>Nimi</label><input id="reqName" placeholder="Anna Virtanen"></div><div class="field"><label>Puhelin</label><input id="reqPhone" placeholder="040..."></div><div class="field"><label>Tuote</label><input id="reqProd" list="tuoteOptions" placeholder="Käsilaukku"></div><div class="field"><label>Työ</label><input id="reqWork" list="korjausOptions" placeholder="Vetoketjun vaihto"></div><div class="field full"><label>Viesti</label><textarea id="reqMsg" placeholder="Viestin sisältö..."></textarea></div></div><div class="modal-actions"><button class="cancel" onclick="closeModal()">Peruuta</button><button class="save" onclick="saveRequestForm()">TALLENNA KYSELY</button></div>`;
-  document.getElementById("modal").classList.remove("hidden");
-}
-
-function saveRequestForm(){
-  const name=document.getElementById("reqName").value.trim()||"Uusi asiakas";
-  const phone=document.getElementById("reqPhone").value.trim();
-  const product=document.getElementById("reqProd").value.trim()||"Tuote";
-  const work=document.getElementById("reqWork").value.trim()||"Korjaus";
-  const msg=document.getElementById("reqMsg").value.trim();
-  const newReq = {id:Date.now(),name,product,work,msg,status:"new",reply:"",source:"whatsapp",request_id:makeRequestId("whatsapp"),customer_id:makeCustomerId(),created_at:new Date().toISOString().slice(0,10),price:""};
-  requests.unshift(newReq);
-  saveState();
-  dbUpsertRequest(newReq);
-  closeModal();
-  renderInbox();
 }
 
 let intakeImageBase64 = null;
@@ -554,7 +472,6 @@ async function saveJob(addAnother = false){
     const nextId = "#" + jobIdSeq;
     jobIdSeq++;
 
-    const matchedReq = activeConvertingRequestId ? requests.find(x => x.id === activeConvertingRequestId) : null;
     const source = document.getElementById("source")?.value || "store";
     const status = source === "whatsapp" ? (document.getElementById("whatsappStage")?.value || "waiting") : "active";
 
@@ -588,17 +505,9 @@ async function saveJob(addAnother = false){
       source,
       loc:document.getElementById("loc").value||"A1-01",
       img:imgUrl,
-      note:document.getElementById("note").value,
-      request_id: matchedReq ? matchedReq.request_id : null
+      note:document.getElementById("note").value
     };
     jobs.unshift(j);
-
-    if (matchedReq) {
-      matchedReq.job_id = j.id;
-      matchedReq.status = "converted";
-      dbUpsertRequest(matchedReq);
-      activeConvertingRequestId = null;
-    }
 
     saveState();
     dbInsertJob(j);
@@ -1062,33 +971,36 @@ function openCalendarDay(dateStr){
   document.getElementById("modal").classList.remove("hidden");
 }
 
+let customerListCache = [];
 function renderCustomers(){
   const customerMap = {};
-  
+
   jobs.forEach(j => {
     const name = (j.name || "Uusi asiakas").trim();
     const phone = (j.phone || "").trim();
     const key = name.toLowerCase() + "|" + phone;
-    
+
     if (!customerMap[key]) {
       customerMap[key] = {
         name: name,
         phone: phone,
         visits: 0,
-        totalSpent: 0
+        totalSpent: 0,
+        jobs: []
       };
     }
-    
+
     customerMap[key].visits += 1;
     customerMap[key].totalSpent += Number(j.price) || 0;
+    customerMap[key].jobs.push(j);
   });
-  
-  const customerList = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
-  
-  document.getElementById("customersGrid").innerHTML = customerList.map(c => {
+
+  customerListCache = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
+
+  document.getElementById("customersGrid").innerHTML = customerListCache.map((c, idx) => {
     const initial = c.name ? c.name.charAt(0).toUpperCase() : "?";
     return `
-      <div class="customer">
+      <div class="customer" onclick="openCustomerHistory(${idx})" style="cursor:pointer;">
         <div class="person">
           <div class="person-icon" style="display:flex;align-items:center;justify-content:center;font-weight:bold;background:var(--primary-light);color:var(--primary);">${initial}</div>
           <div>
@@ -1101,6 +1013,23 @@ function renderCustomers(){
       </div>
     `;
   }).join("");
+}
+
+function openCustomerHistory(idx){
+  const c = customerListCache[idx];
+  if(!c) return;
+  const sortedJobs = [...c.jobs].sort((a,b)=> (b.created_at||"").localeCompare(a.created_at||""));
+  document.getElementById("modalBody").innerHTML = `<h2>${c.name}</h2>
+<p style="font-size:12px;color:#78858d">${c.phone||"Ei puhelinnumeroa"} · ${c.visits} käyntiä · ${c.totalSpent} € yhteensä</p>
+<div style="display:grid;gap:8px;margin-top:15px;max-height:360px;overflow-y:auto;">
+  ${sortedJobs.map(j=>`<div class="wide-btn" style="text-align:left;cursor:pointer;" onclick="closeModal();openJob('${j.id}')">
+    <b>${j.id} · ${j.product}</b><br><small>${j.work} · ${j.date} · <span class="pill ${statusPillClass(j.status)}" style="margin-left:4px;">${statusLabel[j.status]||j.status}</span> · ${j.price} €</small>
+  </div>`).join("")}
+</div>
+<div class="modal-actions" style="margin-top:15px;">
+  <button class="cancel" onclick="closeModal()">Sulje</button>
+</div>`;
+  document.getElementById("modal").classList.remove("hidden");
 }
 
 function closeModal(){document.getElementById("modal").classList.add("hidden")}
@@ -1146,7 +1075,6 @@ async function checkAuth() {
     if (event === "SIGNED_OUT") {
       currentUser = null;
       jobs = [];
-      requests = [];
       showLoginScreen();
     }
     if (event === "PASSWORD_RECOVERY") {
@@ -1205,7 +1133,6 @@ async function logout() {
   }
   currentUser = null;
   jobs = [];
-  requests = [];
   showLoginScreen();
 }
 
@@ -1285,228 +1212,8 @@ async function changePassword() {
   statusEl.style.color = "var(--teal)";
 }
 
-/* V5: workshop-specific inbox override */
-let waFilter="all";
-function setWaFilter(f,btn){
-  waFilter=f; document.querySelectorAll(".wa-filter").forEach(x=>x.classList.remove("active")); btn.classList.add("active"); renderWhatsappV5();
-}
+const SOURCE_META={store:{code:"S",label:"Myymälä",icon:"🏪"},whatsapp:{code:"W",label:"WhatsApp",icon:"💬"}};
 
-function renderWhatsappV5(){
-  const q=(document.getElementById("chatSearch")?.value||"").toLowerCase();
-  let a=requests.filter(r=>(r.name+r.product+r.work+r.msg).toLowerCase().includes(q));
-  if(waFilter==="new")a=a.filter(r=>r.status==="new");
-  if(waFilter==="bring")a=a.filter(r=>r.status==="bring");
-  if(waFilter==="arrived")a=a.filter(r=>r.status==="arrived");
-  const list=document.getElementById("chatList"); if(!list)return;
-  list.innerHTML=a.map((r,i)=>`<div class="chat-item ${i===0?'active':''}" onclick="openWorkshopChat(${r.id},this)">
-   <div class="chat-avatar">${r.name[0]}</div>
-   <div class="chat-text"><b>${r.name}</b><p>${r.msg}</p><span class="pill ${r.status==='new'?'orange':r.status==='bring'?'teal':r.status==='arrived'?'blue':'teal'}">${r.status==="new"?"Uusi":r.status==="bring"?"Asiakas tuo":r.status==="arrived"?"Tuote saapui":"Vastattu"}</span></div>
-   <div class="chat-time">${i<2?"18:2"+i:"eilen"}</div>
-  </div>`).join("");
-  if(a.length)openWorkshopChat(a[0].id,list.firstElementChild);
-  else document.getElementById("chatWindow").innerHTML='<div class="empty-chat"><div class="wa-icon">⌕</div><h2>Kyselyä ei löytynyt</h2><p>Muuta suodatinta tai hakua.</p></div>';
-}
-
-function openWorkshopChat(id,el){
-  document.querySelectorAll(".chat-item").forEach(x=>x.classList.remove("active")); if(el)el.classList.add("active");
-  const r=requests.find(x=>x.id===id);
-  const linked=jobs.find(j=>j.id===r.job_id || j.request_id===r.request_id || j.name===r.name);
-  const status=r.status==="new"?"Uusi":r.status==="bring"?"Asiakas tuo":r.status==="arrived"?"Tuote saapui":r.status==="converted"?"Luotu työksi":"Vastattu";
-  document.getElementById("chatWindow").innerHTML=`
-  <div class="chat-head"><div class="chat-avatar">${r.name[0]}</div><div><b>${r.name}</b><small>${r.product} · ${r.work}</small></div><span class="chat-status">${status}</span></div>
-  <div class="customer-context"><span>👜</span><strong>${r.product}</strong><span>· ${r.work}</span><span class="context-badge">${linked?linked.id:"Kysely #"+r.id}</span></div>
-  <div class="messages">
-    <div class="msg in">${r.msg}<small>18:21</small></div>
-    ${r.reply?`<div class="msg out">${r.reply}<small>18:24 ✓✓</small></div>`:''}
-    ${r.status==="bring"?`<div class="msg in">Tuon sen huomenna.<small>18:26</small></div>`:''}
-    ${r.status==="arrived"?`<div class="msg in">Tuotu tänään. 😊<small>10:14</small></div>`:''}
-  </div>
-  ${r.status==="new"?`<div class="ai-suggest"><b>✨ AI-vastaussuositus</b>Hei! Kiitos kuvista ja viestistäsi! 😊 ${r.work} onnistuu. Lopullinen hinta varmistetaan, kun näemme tuotteen liikkeessä.<br><button class="side-action alt" onclick="useAiReplyV5(${r.id})">Käytä vastausta</button></div>`:''}
-  <div class="quick-reply-row">
-    <button class="quick-reply" onclick="sendTemplate(${r.id},'price')">💶 Hintatiedot</button>
-    <button class="quick-reply" onclick="sendTemplate(${r.id},'bring')">📦 Tuomista varten</button>
-    <button class="quick-reply" onclick="sendTemplate(${r.id},'ready')">✅ Valmis-viesti</button>
-    <button class="quick-reply" onclick="sendTemplate(${r.id},'hours')">Aukioloajat</button>
-  </div>
-  <div class="chat-compose"><input id="waInput" placeholder="Kirjoita WhatsApp-viesti..."><button class="send-btn" onclick="sendManual(${r.id})">➤</button></div>`;
-  
-  document.getElementById("chatSide").innerHTML=`
-    <div class="side-title">Työnkulku</div>
-    <div class="workflow-box"><div class="wf-title">Kysely → Toimitus</div><div class="wf-track">
-     <div class="wf-node done"><i>✓</i>Viesti</div><div class="wf-line"></div>
-     <div class="wf-node ${r.status==="new"?"current":"done"}"><i>${r.status==="new"?"2":"✓"}</i>Vastaus</div><div class="wf-line"></div>
-     <div class="wf-node ${r.status==="bring"?"current":(r.status==="arrived"||r.status==="converted")?"done":""}"><i>3</i>Tuo</div><div class="wf-line"></div>
-     <div class="wf-node ${r.status==="arrived"||r.status==="converted"?"current":""}"><i>4</i>Tuote</div>
-    </div></div>
-    <div class="side-title">Asiakas</div>
-    <div class="side-card"><b>${r.name}</b><p>WhatsApp<br>${r.product}</p></div>
-    <div class="side-title">Työ</div>
-    <div class="side-card"><b>${r.work}</b><p>Hinta: <strong>${linked?linked.price+" €":"45–60 €"}</strong><br>${linked?"📍 Hylly "+linked.loc:"📅 Odottaa tuotetta"}</p></div>
-    ${r.status==="new"?`<button class="side-action" onclick="markBring(${r.id})">📅 ASIAKAS TUO</button>`:""}
-    ${r.status==="bring"?`<button class="side-action" onclick="markArrived(${r.id})">📦 TUOTE SAAPUI</button>`:""}
-    ${r.status==="arrived"?`<button class="side-action" onclick="openIntake(requests.find(x=>x.id===${r.id}))">🔧 LUO TYÖ</button>`:""}
-    ${linked?`<button class="side-action alt" onclick="openJob('${linked.id}')">⚒ Avaa työ ${linked.id}</button>`:""}
-    <div class="side-title" style="margin-top:14px">Pikavastaukset</div>
-    <div class="template-list"><div class="template" onclick="sendTemplate(${r.id},'price')">Hinta-arvio</div><div class="template" onclick="sendTemplate(${r.id},'bring')">Tuonti</div><div class="template" onclick="sendTemplate(${r.id},'ready')">Valmis</div></div>
-    <hr style="border:0;border-top:1px solid var(--border);margin:15px 0">
-    <button class="side-action" style="background:#ef4444;color:white;font-weight:600;margin-top:8px;" onclick="deleteRequest(${r.id})">🗑️ POISTA KYSELY</button>`;
-}
-
-function markBring(id){let r=requests.find(x=>x.id===id);r.status="bring";r.reply="Hei! Tervetuloa tuomaan tuotteen meille. 😊";saveState();dbUpsertRequest(r);renderWhatsappV5()}
-function markArrived(id){let r=requests.find(x=>x.id===id);r.status="arrived";saveState();dbUpsertRequest(r);renderWhatsappV5();openWorkshopChat(id)}
-function useAiReplyV5(id){let r=requests.find(x=>x.id===id);r.reply=`Hei! Kiitos kuvista ja viestistäsi! 😊 ${r.work} onnistuu. Lopullinen hinta varmistetaan, kun näemme tuotteen liikkeessä.`;r.status="answered";saveState();dbUpsertRequest(r);renderWhatsappV5()}
-function sendTemplate(id,type){
-  let r=requests.find(x=>x.id===id), text={
-    price:"Hei! Kiitos viestistäsi! 😊 Hinta-arvio on noin 45–60 €. Lopullinen hinta varmistetaan liikkeessä.",
-    bring:"Hei! Tervetuloa tuomaan tuotteen meille, kun sinulle sopii. 😊",
-    ready:"Hei! 😊 Työsi on valmis ja voit noutaa sen liikkeestämme.",
-    hours:"Hei! Olemme avoinna arkisin. Tervetuloa!"
-  }[type];
-  r.reply=text;r.status=type==="ready"?"ready":type==="bring"?"bring":"answered";saveState();dbUpsertRequest(r);renderWhatsappV5();
-}
-function sendManual(id){const inp=document.getElementById("waInput");if(!inp||!inp.value.trim())return;let r=requests.find(x=>x.id===id);r.reply=inp.value;r.status="answered";saveState();dbUpsertRequest(r);renderWhatsappV5()}
-renderWhatsappV5();
-
-/* V6 Manual WhatsApp import */
-function openImportModal(){document.getElementById("importModal").style.display="grid";document.getElementById("extracted").style.display="none";}
-function closeImportModal(){document.getElementById("importModal").style.display="none";}
-function setImportTab(tab,btn){document.querySelectorAll(".itab").forEach(x=>x.classList.remove("active"));btn.classList.add("active");document.getElementById("imageImport").style.display=tab==="image"?"block":"none";document.getElementById("textImport").style.display=tab==="text"?"block":"none";}
-let uploadedImageBase64 = null;
-let uploadedImageMimeType = null;
-
-async function previewImportImage(e){
-  const f=e.target.files?.[0];
-  if(!f)return;
-  const img=document.getElementById("importPreview");
-  document.getElementById("dropContent").style.display="none";
-
-  try {
-    const displayFile = await toDisplayableImage(f);
-    uploadedImageMimeType = displayFile.type;
-    img.src=URL.createObjectURL(displayFile);
-    img.style.display="block";
-
-    const dataUrl = await blobToDataURL(displayFile);
-    uploadedImageBase64 = dataUrl.split(",")[1];
-  } catch (err) {
-    console.error("Import image preview failed:", err);
-    document.getElementById("dropContent").style.display="block";
-    alert("Kuvan lataus epäonnistui. Yritä uudelleen.");
-  }
-}
-
-function guessFields(text){
-  text=(text||"").trim(); const t=text.toLowerCase();
-  let product=/laukku|bag|käsilaukku/.test(t)?"Käsilaukku":/kenkä|shoe|keng/.test(t)?"Kengät":/takki|jacket/.test(t)?"Takki":"Tuote";
-  let work=/vetoketju|zipper/.test(t)?"Vetoketjun korjaus":/pohja|sole/.test(t)?"Pohjan korjaus":/sauma|ommel/.test(t)?"Dikiö / Sauma":"Korjausarvio";
-  return {product,work};
-}
-
-function fillExtracted(text,defaults={}){
-  const g=guessFields(text);
-  document.getElementById("exName").value=defaults.name||"";
-  document.getElementById("exPhone").value=defaults.phone||"";
-  document.getElementById("exProduct").value=defaults.product||g.product;
-  document.getElementById("exWork").value=defaults.work||g.work;
-  document.getElementById("exPrice").value=defaults.price||"";
-  document.getElementById("exReplyText").value=defaults.reply||"";
-  document.getElementById("exMessage").value=text||"WhatsApp-viestistä tuotu kysely.";
-  document.getElementById("extracted").style.display="block";
-}
-
-async function showExtracted(){
-  const apiKey = localStorage.getItem("suutari_gemini_key");
-  
-  if (!apiKey) {
-    fillExtracted("", {name: "", phone: "", product: "", work: "", price: "", reply: ""});
-    return;
-  }
-
-  const btn = document.querySelector("#imageImport .analyze-btn");
-  const oldText = btn.textContent;
-  btn.textContent = "Analysoidaan... ⌛";
-  btn.disabled = true;
-  
-  let result = null;
-  if (uploadedImageBase64 && uploadedImageMimeType) {
-    result = await analyzeImageWithAI(uploadedImageBase64, uploadedImageMimeType);
-  }
-  
-  btn.textContent = oldText;
-  btn.disabled = false;
-  
-  if (result) {
-    fillExtracted("", {
-      name: result.name || "Asiakas",
-      phone: result.phone || "",
-      product: result.product || "",
-      work: result.work || "",
-      price: result.price || "",
-      reply: result.reply || ""
-    });
-  } else {
-    fillExtracted("", {name: "", phone: "", product: "", work: "", price: "", reply: ""});
-  }
-}
-
-async function extractFromText(){
-  const t=document.getElementById("pasteMessage").value;
-  if(!t.trim()){alert("Liitä WhatsApp-viesti.");return;}
-  
-  const apiKey = localStorage.getItem("suutari_gemini_key");
-  if (!apiKey) {
-    const g = guessFields(t);
-    fillExtracted(t, {name: "Asiakas", phone: "", product: g.product, work: g.work, price: "", reply: ""});
-    return;
-  }
-
-  const btn = document.querySelector("#textImport .analyze-btn");
-  const oldText = btn.textContent;
-  btn.textContent = "Analysoidaan... ⌛";
-  btn.disabled = true;
-  
-  let result = null;
-  if (apiKey) {
-    result = await parseMessageWithAI(t);
-  }
-  
-  btn.textContent = oldText;
-  btn.disabled = false;
-  
-  if (result) {
-    fillExtracted(t, {
-      name: result.name || "Asiakas",
-      phone: result.phone || "",
-      product: result.product || "",
-      work: result.work || "",
-      price: result.price || "",
-      reply: result.reply || ""
-    });
-  } else {
-    const g = guessFields(t);
-    fillExtracted(t, {name: "Asiakas", phone: "", product: g.product, work: g.work, price: "", reply: ""});
-  }
-}
-function saveImportedRequest(){
-  const name=document.getElementById("exName").value.trim()||"Uusi asiakas";
-  const product=document.getElementById("exProduct").value.trim()||"Tuote";
-  const work=document.getElementById("exWork").value.trim()||"Korjausarvio";
-  const msg=document.getElementById("exMessage").value.trim();
-  const status=document.getElementById("exStatus").value;
-  const newReq = {id:Date.now(),name,product,work,msg,status,reply:"",source:"whatsapp",request_id:makeRequestId("whatsapp"),customer_id:makeCustomerId(),created_at:new Date().toISOString().slice(0,10),price:""};
-  requests.unshift(newReq);
-  saveState();
-  dbUpsertRequest(newReq);
-  closeImportModal();waFilter="all";renderWhatsappV5();
-  const page=document.querySelector('[data-page="inbox"]');if(page)page.click();
-}
-
-/* V7 data model + reports/export */
-const SOURCE_META={store:{code:"S",label:"Myymälä",icon:"🏪"},whatsapp:{code:"W",label:"WhatsApp",icon:"💬"},email:{code:"E",label:"Sähköposti",icon:"✉️"},post:{code:"P",label:"Posti",icon:"📦"}};
-function makeRequestId(source){requestSeq[source]=(requestSeq[source]||0)+1;return `${SOURCE_META[source].code}-2026-${String(requestSeq[source]).padStart(6,"0")}`}
-function makeCustomerId(){customerSeq++;return `C-2026-${String(customerSeq).padStart(6,"0")}`}
-function makeJobId(){jobSeq++;return `J-2026-${String(jobSeq).padStart(6,"0")}`}
-function normalizeRequests(){requests.forEach(r=>{r.source=r.source||"whatsapp";r.request_id=r.request_id||makeRequestId(r.source);r.customer_id=r.customer_id||makeCustomerId();r.created_at=r.created_at||"2026-08-24";if(r.status==="converted"&&!r.job_id)r.job_id=makeJobId();if(r.price===undefined)r.price=""})}
 function jobCreatedDateStr(j){
   // created_at comes back from Supabase as an ISO timestamp; fall back to
   // the delivery date for jobs that haven't synced yet.
@@ -1612,25 +1319,7 @@ function copySQLSetup() {
   // Locked-down version: table access requires a real Supabase Auth session
   // (role = authenticated). Anonymous visitors can only call get_job_status()
   // for order tracking — they get no direct table access at all.
-  const sql = `-- Create requests table
-CREATE TABLE IF NOT EXISTS requests (
-    id BIGINT PRIMARY KEY,
-    name TEXT,
-    product TEXT,
-    work TEXT,
-    status TEXT,
-    img TEXT,
-    msg TEXT,
-    reply TEXT,
-    source TEXT,
-    request_id TEXT UNIQUE,
-    customer_id TEXT,
-    created_at TEXT,
-    price TEXT,
-    job_id TEXT
-);
-
--- Create jobs table
+  const sql = `-- Create jobs table
 CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -1659,24 +1348,16 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'store';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE;
 
 -- Enable Row Level Security (RLS)
-ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 
 -- Remove any old wide-open public policies (safe if they don't exist)
-DROP POLICY IF EXISTS "Allow public read" ON requests;
-DROP POLICY IF EXISTS "Allow public insert" ON requests;
-DROP POLICY IF EXISTS "Allow public update" ON requests;
-DROP POLICY IF EXISTS "Allow public delete" ON requests;
 DROP POLICY IF EXISTS "Allow public read" ON jobs;
 DROP POLICY IF EXISTS "Allow public insert" ON jobs;
 DROP POLICY IF EXISTS "Allow public update" ON jobs;
 DROP POLICY IF EXISTS "Allow public delete" ON jobs;
-DROP POLICY IF EXISTS "Authenticated full access" ON requests;
 DROP POLICY IF EXISTS "Authenticated full access" ON jobs;
 
--- Only logged-in staff (Supabase Auth) may read/write these tables
-CREATE POLICY "Authenticated full access" ON requests
-  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+-- Only logged-in staff (Supabase Auth) may read/write this table
 CREATE POLICY "Authenticated full access" ON jobs
   FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
@@ -1734,147 +1415,6 @@ function saveGeminiSettings() {
     statusEl.textContent = "AI-avain poistettu. Käytetään manuaalisia oletuksia.";
     statusEl.style.color = "var(--text-muted)";
   }
-}
-
-async function parseMessageWithAI(text) {
-  const apiKey = localStorage.getItem("suutari_gemini_key");
-  if (!apiKey) return null;
-  
-  const instructions = localStorage.getItem("suutari_ai_instructions") || "";
-  const targets = [
-    { ver: "v1", model: "gemini-2.0-flash" },
-    { ver: "v1beta", model: "gemini-2.0-flash" },
-    { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" },
-    { ver: "v1", model: "gemini-1.5-pro" },
-    { ver: "v1beta", model: "gemini-1.5-pro" }
-  ];
-  
-  const prompt = `Lue seuraava WhatsApp-keskustelu tai viesti ja poimi siitä tiedot JSON-muodossa. 
-Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
-
-Tässä ovat ateljeen omistajan antamat hinnasto- ja työsäännöt, joita sinun on EHDOTTOMASTI noudatettava tehdessäsi hinta-arviota ja vastausta:
-${instructions}
-
-JSON-objektin on oltava täsmälleen seuraavassa muodossa:
-{
-  "name": "Asiakkaan nimi (jos löytyy, muuten tyhjä)",
-  "phone": "Asiakkaan puhelinnumero (jos löytyy, muuten tyhjä)",
-  "product": "Tuote Finceksi (esim. Käsilaukku, Nahkakengät, Takki)",
-  "work": "Tarvittava korjaustyö Finceksi lyhyesti (esim. Vetoketjun korjaus, Koron korjaus)",
-  "price": "Arvioitu hinta numeroina (esim. 45)",
-  "reply": "Kunnioittava ja ystävällinen vastaus viestiin Fince. Ehdota arvioitua hintaa ja toivota heidät tervetulleiksi tuomaan tuote Tehtaankatu 18 -liikkeeseemme."
-}
-
-Viesti:
-"${text}"`;
-
-  let lastErrorMsg = "Tuntematon virhe";
-  for (const t of targets) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.candidates && data.candidates[0]) {
-        const resultText = data.candidates[0].content.parts[0].text.trim();
-        let cleanText = resultText.trim();
-        const firstBracket = cleanText.indexOf('{');
-        const lastBracket = cleanText.lastIndexOf('}');
-        if (firstBracket !== -1 && lastBracket !== -1) {
-          cleanText = cleanText.substring(firstBracket, lastBracket + 1);
-        }
-        return JSON.parse(cleanText);
-      } else if (data.error) {
-        lastErrorMsg = `${t.model} (${t.ver}): ${data.error.message}`;
-      }
-    } catch (err) {
-      console.warn(`Model ${t.model} on ${t.ver} failed, trying next...`, err);
-      lastErrorMsg = `${t.model} (${t.ver}): ${err.message}`;
-    }
-  }
-  
-  alert(`Google Gemini API Virhe: Mikään kokeilluista tekoälymalleista ei vastannut.\n\nPalvelimen virhe: "${lastErrorMsg}"\n\nVarmista, että API-avaimesi on luotu oikein Google AI Studiossa.`);
-  return null;
-}
-
-async function analyzeImageWithAI(base64Data, mimeType) {
-  const apiKey = localStorage.getItem("suutari_gemini_key");
-  if (!apiKey) return null;
-  
-  const instructions = localStorage.getItem("suutari_ai_instructions") || "";
-  const targets = [
-    { ver: "v1", model: "gemini-2.0-flash" },
-    { ver: "v1beta", model: "gemini-2.0-flash" },
-    { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" },
-    { ver: "v1", model: "gemini-1.5-pro" },
-    { ver: "v1beta", model: "gemini-1.5-pro" }
-  ];
-  
-  const prompt = `Olet suutarin ja nahan korjauksen ammattilainen. Analysoi tämä kuva vauriosta/tuotteesta ja poimi tiedot JSON-muodossa. 
-Vastaa AINOASTAAN puhtaalla JSON-objektilla, älä käytä markdown-koodiblokkeja tai mitään selityksiä.
-
-Tässä ovat ateljeen omistajan antamat hinnasto- ja työsäännöt, joita sinun on EHDOTTOMASTI noudatettava tehdessäsi hinta-arviota ja vastausta:
-${instructions}
-
-JSON-objektin on oltava täsmälleen seuraavassa muodossa:
-{
-  "name": "Asiakas",
-  "phone": "",
-  "product": "Tunnistettu tuote Finceksi (esim. Käsilaukku, Kengät, Saappaat)",
-  "work": "Tarvittava korjaustyö kuvan perusteella Finceksi lyhyesti (esim. Vetoketjun vaihto, Koron uusiminen, Sauman tikkaus)",
-  "price": "Arvioitu hinta numeroina (esim. 45)",
-  "reply": "Kunnioittava ja ystävällinen vastaus asiakkaan kuvaan Fince. Ehdota vaurion perusteella arvioitua hintaa ja toivota heidät tervetulleiksi tuomaan tuote Tehtaankatu 18 -liikkeeseemme."
-}
-
-Jos et pysty tunnistamaan tuotetta tai työtä varmasti, arvaa parhaan kykysi mukaan.`;
-
-  let lastErrorMsg = "Tuntematon virhe";
-  for (const t of targets) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data
-                }
-              }
-            ]
-          }]
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.candidates && data.candidates[0]) {
-        const resultText = data.candidates[0].content.parts[0].text.trim();
-        let cleanText = resultText.trim();
-        const firstBracket = cleanText.indexOf('{');
-        const lastBracket = cleanText.lastIndexOf('}');
-        if (firstBracket !== -1 && lastBracket !== -1) {
-          cleanText = cleanText.substring(firstBracket, lastBracket + 1);
-        }
-        return JSON.parse(cleanText);
-      } else if (data.error) {
-        lastErrorMsg = `${t.model} (${t.ver}): ${data.error.message}`;
-      }
-    } catch (err) {
-      console.warn(`Model ${t.model} on ${t.ver} failed on image analysis, trying next...`, err);
-      lastErrorMsg = `${t.model} (${t.ver}): ${err.message}`;
-    }
-  }
-  
-  alert(`Google Gemini API Virhe: Kuvan analysointi epäonnistui kaikilla malleilla.\n\nPalvelimen virhe: "${lastErrorMsg}"\n\nVarmista API-avain.`);
-  return null;
 }
 
 let afterImageBase64 = null;
@@ -1974,6 +1514,14 @@ function loadJobForSocial() {
     afterPreview.style.display = "none";
     afterDropText.style.display = "block";
   }
+}
+
+function copyCaption() {
+  const text = document.getElementById("aiCaptionText")?.textContent || "";
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    alert("Teksti kopioitu leikepöydälle!");
+  });
 }
 
 async function generateAISocialPost() {
@@ -2219,51 +1767,6 @@ function saveAIInstructions() {
   status.style.display = "block";
 }
 
-function sendWhatsAppReply() {
-  const phone = document.getElementById("exPhone").value.replace(/[^0-9+]/g, "") || "0400000000";
-  const replyText = encodeURIComponent(document.getElementById("exReplyText").value);
-  const link = `https://wa.me/${phone}?text=${replyText}`;
-  window.open(link, "_blank");
-}
-
-function convertRequestToJob() {
-  const name=document.getElementById("exName").value.trim()||"Uusi asiakas";
-  const product=document.getElementById("exProduct").value.trim()||"Tuote";
-  const work=document.getElementById("exWork").value.trim()||"Korjausarvio";
-  const msg=document.getElementById("exMessage").value.trim();
-  const status="converted";
-  const newReq = {
-    id:Date.now(),
-    name,
-    product,
-    work,
-    msg,
-    status,
-    reply:"",
-    source:"whatsapp",
-    request_id:makeRequestId("whatsapp"),
-    customer_id:makeCustomerId(),
-    created_at:new Date().toISOString().slice(0,10),
-    price:document.getElementById("exPrice").value
-  };
-  requests.unshift(newReq);
-  saveState();
-  dbUpsertRequest(newReq);
-  
-  activeConvertingRequestId = newReq.id;
-  
-  const prefill = {
-    name: newReq.name,
-    phone: document.getElementById("exPhone").value,
-    product: newReq.product,
-    work: newReq.work,
-    price: newReq.price,
-    img: uploadedImageBase64 || null
-  };
-  closeModal();
-  openIntake(prefill);
-}
-
 async function testAISettings() {
   const key = document.getElementById("geminiKey").value.trim();
   const statusEl = document.getElementById("aiStatus");
@@ -2346,15 +1849,6 @@ function deleteJob(id) {
     dbDeleteJob(id);
     showPage("home");
     renderHome();
-  }
-}
-
-function deleteRequest(id) {
-  if (confirm("Haluatko varmasti poistaa tämän kyselyn/viestin kokonaan? Tätä ei voi peruuttaa.")) {
-    requests = requests.filter(x => x.id !== id);
-    saveState();
-    dbDeleteRequest(id);
-    renderWhatsappV5();
   }
 }
 
