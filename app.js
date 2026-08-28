@@ -32,6 +32,26 @@ function blobToDataURL(blob) {
   });
 }
 
+// Uploads a photo to Supabase Storage and returns its public URL, instead of
+// embedding the photo as base64 directly in the jobs table. Real phone
+// photos run 3-8MB each; with base64 several jobs already made a plain
+// "select * from jobs" time out (Postgres error 57014, statement timeout),
+// which silently broke syncing across devices. Storage keeps each jobs row
+// tiny (just a URL string) so listing/syncing jobs stays fast regardless of
+// how many photos have been taken.
+async function uploadJobImage(file, jobId, tag) {
+  if (!supabaseClient) throw new Error("Ei yhteyttä tietokantaan");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `${jobId.replace(/[^a-zA-Z0-9-]/g, "")}-${tag}-${Date.now()}.${ext}`;
+  const { error } = await supabaseClient.storage.from("job-photos").upload(path, file, {
+    upsert: true,
+    contentType: file.type || "image/jpeg"
+  });
+  if (error) throw error;
+  const { data } = supabaseClient.storage.from("job-photos").getPublicUrl(path);
+  return data.publicUrl;
+}
+
 let jobs=[];
 let requests=[];
 let requestSeq={store:146,whatsapp:87,email:33,post:20};
@@ -538,6 +558,24 @@ async function saveJob(addAnother = false){
     const source = document.getElementById("source")?.value || "store";
     const status = source === "whatsapp" ? (document.getElementById("whatsappStage")?.value || "waiting") : "active";
 
+    // Upload the actual photo file to Storage (not base64-in-the-row) so the
+    // jobs table stays light and syncing across devices stays fast. Falls
+    // back to the local base64 preview if the upload fails (e.g. offline).
+    let imgUrl = intakeImageBase64 || bag;
+    const selectedFile = document.getElementById("jobFile")?.files?.[0];
+    if (selectedFile) {
+      const saveButtons = document.querySelectorAll(".modal-actions .save");
+      const originalLabels = Array.from(saveButtons).map(b => b.textContent);
+      saveButtons.forEach(b => { b.disabled = true; b.textContent = "⏳ Tallennetaan kuvaa..."; });
+      try {
+        imgUrl = await uploadJobImage(selectedFile, nextId, "before");
+      } catch (err) {
+        notifyDbError("kuvan tallennus pilveen", err);
+      } finally {
+        saveButtons.forEach((b,i) => { b.disabled = false; b.textContent = originalLabels[i]; });
+      }
+    }
+
     let j={
       id: nextId,
       name:document.getElementById("n").value||"Uusi asiakas",
@@ -549,7 +587,7 @@ async function saveJob(addAnother = false){
       status,
       source,
       loc:document.getElementById("loc").value||"A1-01",
-      img:intakeImageBase64 || bag,
+      img:imgUrl,
       note:document.getElementById("note").value,
       request_id: matchedReq ? matchedReq.request_id : null
     };
@@ -694,16 +732,20 @@ async function uploadDetailAfterImage(e, id) {
   const f = e.target.files?.[0];
   if(!f) return;
 
+  // Show the local preview immediately, then upload to Storage in the
+  // background — a base64 preview here is instant and never touches the DB.
+  const preview = document.getElementById("detailAfterPreview");
   try {
     const displayFile = await toDisplayableImage(f);
-    const base64 = await blobToDataURL(displayFile);
+    preview.src = URL.createObjectURL(displayFile);
+    preview.style.opacity = 1;
+
+    const url = await uploadJobImage(displayFile, id, "after");
     const j = jobs.find(x => x.id === id);
     if(j) {
-      j.img_after = base64;
+      j.img_after = url;
       saveState();
-      document.getElementById("detailAfterPreview").src = base64;
-      document.getElementById("detailAfterPreview").style.opacity = 1;
-      dbUpdateJobAfterImage(id, base64);
+      dbUpdateJobAfterImage(id, url);
     }
   } catch (err) {
     console.error("After-photo upload failed:", err);
@@ -1535,7 +1577,30 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Only this narrow function is public; the tables themselves are not
 GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO anon;
-GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;`;
+GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;
+
+-- Job photo storage: photos are uploaded here (not embedded as base64 in
+-- the jobs table) so "select * from jobs" stays fast no matter how many
+-- photos have been taken. Bucket is public for reads (so <img> tags and the
+-- customer tracking page can load photos directly); only logged-in staff
+-- can upload/change/delete.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('job-photos', 'job-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Authenticated upload job photos" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated update job photos" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated delete job photos" ON storage.objects;
+DROP POLICY IF EXISTS "Public read job photos" ON storage.objects;
+
+CREATE POLICY "Authenticated upload job photos" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'job-photos');
+CREATE POLICY "Authenticated update job photos" ON storage.objects
+  FOR UPDATE TO authenticated USING (bucket_id = 'job-photos');
+CREATE POLICY "Authenticated delete job photos" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'job-photos');
+CREATE POLICY "Public read job photos" ON storage.objects
+  FOR SELECT TO public USING (bucket_id = 'job-photos');`;
   navigator.clipboard.writeText(sql).then(() => {
     alert("SQL-alustuskoodi kopioitu leikepöydälle!");
   });
@@ -1711,16 +1776,17 @@ async function loadAfterImage(e) {
     preview.src = URL.createObjectURL(displayFile);
     preview.style.display = "block";
 
-    afterImageBase64 = await blobToDataURL(displayFile);
-
     const select = document.getElementById("socialJobSelect");
     const jobId = select.value;
+    const url = await uploadJobImage(displayFile, jobId || "social", "after");
+    afterImageBase64 = url;
+
     if (jobId) {
       const j = jobs.find(x => x.id === jobId);
       if (j) {
-        j.img_after = afterImageBase64;
+        j.img_after = url;
         saveState();
-        dbUpdateJobAfterImage(jobId, afterImageBase64);
+        dbUpdateJobAfterImage(jobId, url);
       }
     }
   } catch (err) {
@@ -1932,7 +1998,13 @@ function combineImages() {
   
   imgBefore.onload = onImageLoaded;
   imgAfter.onload = onImageLoaded;
-  
+
+  // Photos now often come from Supabase Storage (a different origin) rather
+  // than an inline data: URL — without this, drawing them to the canvas
+  // taints it and canvas.toDataURL() in downloadCombinedImage() below throws.
+  imgBefore.crossOrigin = "anonymous";
+  imgAfter.crossOrigin = "anonymous";
+
   imgBefore.src = beforeSrc;
   imgAfter.src = afterSrc;
 }
