@@ -434,6 +434,7 @@ function openIntake(prefill=null){
     </label>
   </div>
   <div class="field full"><label>Sisäinen huomautus</label><textarea id="note">${prefill?"Siirretty WhatsApp-tiedustelusta.":""}</textarea></div>
+  <div class="field full"><label>Muistiinpano asiakkaalle <small style="font-weight:400;color:var(--text-muted);">(näkyy asiakkaan seurantasivulla)</small></label><textarea id="customerNote" placeholder="Esim. huomioita tuotteesta tai korjauksesta, jotka asiakkaan on hyvä tietää"></textarea></div>
 </div>
 <div class="modal-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
   <button class="cancel" onclick="closeModal()">Peruuta</button>
@@ -505,7 +506,8 @@ async function saveJob(addAnother = false){
       source,
       loc:document.getElementById("loc").value||"A1-01",
       img:imgUrl,
-      note:document.getElementById("note").value
+      note:document.getElementById("note").value,
+      customer_note:document.getElementById("customerNote")?.value||""
     };
     jobs.unshift(j);
 
@@ -766,6 +768,7 @@ function openEditJob(id){
   <div class="field"><label>Toimitus</label><input id="editDate" type="date" value="${isoDate}"></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="editLoc" value="${j.loc||""}"></div>
   <div class="field full"><label>Sisäinen huomautus</label><textarea id="editNote">${j.note||""}</textarea></div>
+  <div class="field full"><label>Muistiinpano asiakkaalle <small style="font-weight:400;color:var(--text-muted);">(näkyy asiakkaan seurantasivulla)</small></label><textarea id="editCustomerNote">${j.customer_note||""}</textarea></div>
 </div>
 <div class="modal-actions">
   <button class="cancel" onclick="closeModal()">Peruuta</button>
@@ -786,9 +789,10 @@ function saveEditJob(id){
   if(d) j.date = d.split("-").reverse().join(".");
   j.loc = document.getElementById("editLoc").value.trim() || j.loc;
   j.note = document.getElementById("editNote").value;
+  j.customer_note = document.getElementById("editCustomerNote").value;
 
   saveState();
-  dbUpdateJob(id, {name:j.name, phone:j.phone, product:j.product, work:j.work, price:j.price, date:j.date, loc:j.loc, note:j.note});
+  dbUpdateJob(id, {name:j.name, phone:j.phone, product:j.product, work:j.work, price:j.price, date:j.date, loc:j.loc, note:j.note, customer_note:j.customer_note});
   closeModal();
   openJob(id);
   renderHome();
@@ -1333,6 +1337,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     img TEXT,
     img_after TEXT,
     note TEXT,
+    customer_note TEXT,
     request_id TEXT,
     source TEXT DEFAULT 'store',
     delivered_at TIMESTAMP WITH TIME ZONE,
@@ -1346,6 +1351,7 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS phone TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS request_id TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'store';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS customer_note TEXT;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
@@ -1361,20 +1367,38 @@ DROP POLICY IF EXISTS "Authenticated full access" ON jobs;
 CREATE POLICY "Authenticated full access" ON jobs
   FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
--- Secure lookup function for customer order tracking (hides phone and names)
+-- Secure lookup functions for customer order tracking (hide phone and the
+-- internal "Sisäinen huomautus" note; only ever expose customer_note).
+-- DROP first: changing the return columns isn't allowed via CREATE OR REPLACE.
+DROP FUNCTION IF EXISTS get_job_status(TEXT);
 CREATE OR REPLACE FUNCTION get_job_status(job_id TEXT)
-RETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT) AS $$
+RETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT, customer_note TEXT) AS $$
 BEGIN
   RETURN QUERY
-  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after
+  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after, j.customer_note
   FROM jobs j
   WHERE j.id = job_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Only this narrow function is public; the tables themselves are not
+-- Looks up every job filed under a given ticket/card number (the physical
+-- card handed to the customer at drop-off; stored in jobs.name).
+CREATE OR REPLACE FUNCTION get_jobs_by_ticket(ticket TEXT)
+RETURNS TABLE(id TEXT, product TEXT, work TEXT, status TEXT, date TEXT, img TEXT, img_after TEXT, customer_note TEXT) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT j.id, j.product, j.work, j.status, j.date, j.img, j.img_after, j.customer_note
+  FROM jobs j
+  WHERE trim(lower(j.name)) = trim(lower(ticket))
+  ORDER BY j.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Only these narrow functions are public; the tables themselves are not
 GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION get_job_status(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_jobs_by_ticket(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION get_jobs_by_ticket(TEXT) TO authenticated;
 
 -- Job photo storage: photos are uploaded here (not embedded as base64 in
 -- the jobs table) so "select * from jobs" stays fast no matter how many

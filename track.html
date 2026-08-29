@@ -196,42 +196,45 @@ hr {
   background: var(--red-light);
   color: var(--red);
 }
+.result-card + .result-card {
+  margin-top: 16px;
+}
+.customer-note {
+  margin-top: 15px;
+  padding: 12px 14px;
+  background: var(--primary-light);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.customer-note b {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.not-found {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 10px 0;
+}
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Seuraa tilaustasi</h1>
-  <p class="subtitle">Syötä työtilauskoodi seurataksesi korjaustyön etenemistä.</p>
-  
+  <p class="subtitle">Syötä korttisi numero (saat sen tuodessasi tuotteen) tai työtilauskoodi.</p>
+
   <div class="search-box">
-    <input type="text" id="trackCode" placeholder="Esim. #1052">
+    <input type="text" id="trackCode" placeholder="Esim. korttinumero tai #1052">
     <button onclick="trackJob()">Hae</button>
   </div>
-  
-  <div class="result-card" id="resultCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-      <h3 id="resJobId">#1052</h3>
-      <span class="status-pill" id="resStatusPill">Työn alla</span>
-    </div>
-    
-    <div class="info-row">
-      <span>Tuote:</span>
-      <strong id="resProduct">Marimekko käsilaukku</strong>
-    </div>
-    <div class="info-row">
-      <span>Tehty korjaus:</span>
-      <strong id="resWork">Vetoketjun vaihto</strong>
-    </div>
-    <div class="info-row">
-      <span>Arvioitu toimitus:</span>
-      <strong id="resDate">28.08.2026</strong>
-    </div>
-    
-    <hr>
-    
-    <div class="timeline" id="timeline"></div>
-  </div>
-  
+
+  <div id="resultsContainer"></div>
+
   <div class="brand-footer">Tehtaankatu Suutari</div>
 </div>
 
@@ -254,25 +257,46 @@ function initSupabase() {
 }
 initSupabase();
 
-async function getJobDetails(code) {
+async function getJobByCode(code) {
   // If Supabase is connected, call RPC status lookup for maximum privacy!
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient.rpc('get_job_status', { job_id: code });
       if (error) throw error;
-      if (data && data.length > 0) return data[0];
+      if (data && data.length > 0) return [data[0]];
     } catch(err) {
       console.error("Supabase RPC lookup failed, falling back to local:", err);
     }
   }
-  
-  // Local storage fallback
+
+  // Local storage fallback (only ever populated on a staff device, not a
+  // customer's, but kept for parity / offline testing)
   const storedJobs = localStorage.getItem("suutari_jobs");
   if (storedJobs) {
     const jobs = JSON.parse(storedJobs);
-    return jobs.find(j => j.id === code);
+    const found = jobs.find(j => j.id === code);
+    return found ? [found] : [];
   }
-  return null;
+  return [];
+}
+
+async function getJobsByTicket(ticket) {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.rpc('get_jobs_by_ticket', { ticket });
+      if (error) throw error;
+      return data || [];
+    } catch(err) {
+      console.error("Supabase RPC lookup failed, falling back to local:", err);
+    }
+  }
+
+  const storedJobs = localStorage.getItem("suutari_jobs");
+  if (storedJobs) {
+    const jobs = JSON.parse(storedJobs);
+    return jobs.filter(j => String(j.name || "").trim().toLowerCase() === ticket.trim().toLowerCase());
+  }
+  return [];
 }
 
 const statusLabel = {
@@ -284,40 +308,15 @@ const statusLabel = {
   done: "Luovutettu asiakkaalle"
 };
 
-async function trackJob() {
-  let code = document.getElementById("trackCode").value.trim();
-  if(!code) return;
-  if(!code.startsWith("#")) {
-    code = "#" + code;
-    document.getElementById("trackCode").value = code;
-  }
-  
-  const card = document.getElementById("resultCard");
-  const j = await getJobDetails(code);
-  
-  if(!j) {
-    alert("Tilausta koodilla " + code + " ei löytynyt. Varmista koodin oikeinkirjoitus.");
-    card.style.display = "none";
-    return;
-  }
-  
-  document.getElementById("resJobId").textContent = j.id;
-  document.getElementById("resProduct").textContent = j.product;
-  document.getElementById("resWork").textContent = j.work;
-  document.getElementById("resDate").textContent = j.date;
-  
-  const pill = document.getElementById("resStatusPill");
-  pill.textContent = statusLabel[j.status] || j.status;
-  pill.className = "status-pill " + (j.status === "late" ? "red" : (j.status === "waiting" || j.status === "arrived") ? "orange" : "teal");
-  
-  // Render timeline steps
+function jobCardHtml(j) {
+  const pillClass = j.status === "late" ? "red" : (j.status === "waiting" || j.status === "arrived") ? "orange" : "teal";
+
   const steps = [
     { label: "Vastaanotettu", status: "done" },
     { label: "Työn alla", status: j.status === "active" || j.status === "late" ? "active" : (j.status === "waiting" || j.status === "ready" || j.status === "done" ? "done" : "pending") },
     { label: "Valmis noudettavaksi", status: j.status === "ready" ? "active" : (j.status === "done" ? "done" : "pending") },
     { label: "Luovutettu asiakkaalle", status: j.status === "done" ? "done" : "pending" }
   ];
-  
   // Special exception for material waiting / WhatsApp orders whose product
   // has arrived at the shop but work hasn't started yet
   if (j.status === "waiting") {
@@ -325,8 +324,8 @@ async function trackJob() {
   } else if (j.status === "arrived") {
     steps[1] = { label: "Tuote saapui, työ alkaa pian", status: "active" };
   }
-  
-  document.getElementById("timeline").innerHTML = steps.map(s => `
+
+  const timelineHtml = steps.map(s => `
     <div class="step ${s.status}">
       <i></i>
       <div>
@@ -335,15 +334,54 @@ async function trackJob() {
       </div>
     </div>
   `).join("");
-  
-  card.style.display = "block";
+
+  const noteHtml = j.customer_note
+    ? `<div class="customer-note"><b>Huomio suutarilta</b>${j.customer_note}</div>`
+    : "";
+
+  return `
+    <div class="result-card" style="display:block;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+        <h3>${j.id}</h3>
+        <span class="status-pill ${pillClass}">${statusLabel[j.status] || j.status}</span>
+      </div>
+      <div class="info-row"><span>Tuote:</span><strong>${j.product}</strong></div>
+      <div class="info-row"><span>Tehty korjaus:</span><strong>${j.work}</strong></div>
+      <div class="info-row"><span>Arvioitu toimitus:</span><strong>${j.date}</strong></div>
+      ${noteHtml}
+      <hr>
+      <div class="timeline">${timelineHtml}</div>
+    </div>
+  `;
 }
 
-// Automatically search if code is in URL query parameters (?code=#1052)
+async function trackJob() {
+  const raw = document.getElementById("trackCode").value.trim();
+  if(!raw) return;
+
+  const container = document.getElementById("resultsContainer");
+  container.innerHTML = `<p class="not-found">Haetaan...</p>`;
+
+  const jobs = raw.startsWith("#") ? await getJobByCode(raw) : await getJobsByTicket(raw);
+
+  if(!jobs.length) {
+    container.innerHTML = `<p class="not-found">Tuloksia ei löytynyt haulla "${raw}". Varmista korttinumero tai työtilauskoodi.</p>`;
+    return;
+  }
+
+  container.innerHTML = jobs.map(jobCardHtml).join("");
+}
+
+// Automatically search if a code or ticket is in the URL query parameters
+// (?code=#1052 from the app's QR link, or ?ticket=9582 from a direct link)
 const params = new URLSearchParams(window.location.search);
 const codeParam = params.get("code");
+const ticketParam = params.get("ticket");
 if (codeParam) {
   document.getElementById("trackCode").value = codeParam;
+  trackJob();
+} else if (ticketParam) {
+  document.getElementById("trackCode").value = ticketParam;
   trackJob();
 }
 </script>
