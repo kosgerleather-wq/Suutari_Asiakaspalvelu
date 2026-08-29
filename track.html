@@ -240,12 +240,20 @@ hr {
   color: var(--text-muted);
   padding: 10px 0;
 }
+.explainer {
+  width: 100%;
+  border-radius: 14px;
+  margin-bottom: 22px;
+  display: block;
+}
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Tilauskysely</h1>
   <p class="subtitle">Syötä tilausnumero (kortin numero, jonka sait tuodessasi tuotteen) tähän ja paina Hae.</p>
+
+  <img class="explainer" src="tilauskysely-explainer.jpg" alt="Esimerkki: kortin numero (esim. 9591) syötetään hakukenttään">
 
   <div class="search-box">
     <input type="text" id="trackCode" placeholder="Esim. 9591" inputmode="numeric" onkeydown="if(event.key==='Enter') trackJob()">
