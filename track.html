@@ -36,49 +36,68 @@ body {
 }
 .container {
   width: 90%;
-  max-width: 480px;
+  max-width: 520px;
   background: var(--card-bg);
   border-radius: 20px;
   box-shadow: 0 10px 30px rgba(15,45,74,0.06);
-  padding: 30px;
+  padding: 36px 30px;
   box-sizing: border-box;
   text-align: center;
 }
 h1 {
   font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
   color: var(--primary);
 }
 p.subtitle {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-muted);
-  margin: 0 0 25px;
+  margin: 0 0 28px;
+  line-height: 1.5;
 }
 .search-box {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 14px;
   margin-bottom: 25px;
 }
 .search-box input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: inherit;
+  width: 100%;
+  padding: 20px 22px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  font-size: 30px;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  text-align: center;
+  letter-spacing: 0.03em;
   outline: none;
   background: var(--bg);
+  color: var(--primary);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+.search-box input:focus {
+  border-color: var(--primary);
+}
+.search-box input::placeholder {
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--text-muted);
 }
 .search-box button {
-  padding: 12px 20px;
+  padding: 16px 20px;
   background: var(--primary);
   color: white;
   border: 0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
   font-family: inherit;
   transition: all 0.2s ease;
@@ -225,11 +244,11 @@ hr {
 </head>
 <body>
 <div class="container">
-  <h1>Seuraa tilaustasi</h1>
-  <p class="subtitle">Syötä korttisi numero (saat sen tuodessasi tuotteen) tai työtilauskoodi.</p>
+  <h1>Tilauskysely</h1>
+  <p class="subtitle">Syötä tilausnumero (kortin numero, jonka sait tuodessasi tuotteen) tähän ja paina Hae.</p>
 
   <div class="search-box">
-    <input type="text" id="trackCode" placeholder="Esim. korttinumero tai #1052">
+    <input type="text" id="trackCode" placeholder="Esim. 9591" inputmode="numeric" onkeydown="if(event.key==='Enter') trackJob()">
     <button onclick="trackJob()">Hae</button>
   </div>
 
