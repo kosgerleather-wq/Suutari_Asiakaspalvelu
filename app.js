@@ -147,6 +147,17 @@ function updateBadges(){
   set("statNewMsg", whatsappWaiting);
   set("todayCount", `${todayListCount} työtä`);
 
+  // Daily business snapshot (Päivän tilanne): today's intake, ready backlog,
+  // today's deliveries and the revenue those deliveries brought in.
+  const todayISO = new Date().toISOString().slice(0,10);
+  const incomingToday = jobs.filter(j => jobCreatedDateStr(j) === todayISO).length;
+  const deliveredTodayJobs = jobs.filter(j => j.delivered_at && String(j.delivered_at).slice(0,10) === todayISO);
+  const revenueToday = deliveredTodayJobs.reduce((sum, j) => sum + (Number(j.price) || 0), 0);
+  set("statIncomingToday", incomingToday);
+  set("statReadyToday", readyJobs);
+  set("statDeliveredToday", deliveredTodayJobs.length);
+  set("statRevenueToday", "€" + revenueToday);
+
   const badge = document.getElementById("notifBadge");
   if (badge) {
     badge.textContent = actionsNeeded > 99 ? "99+" : actionsNeeded;

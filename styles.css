@@ -405,6 +405,16 @@ main {
 .stat.purple strong {
   color: #8b63d8;
 }
+.stat.green {
+  border-top-color: #10b981;
+}
+.stat.green strong {
+  color: #10b981;
+}
+
+.daily-stats {
+  grid-template-columns: repeat(4, 1fr);
+}
 
 /* Section Title */
 .section-title {
