@@ -319,7 +319,7 @@ function showPage(id){
   if(id==="jobs")renderJobs();
   if(id==="calendar")renderCalendar();
   if(id==="customers")renderCustomers();
-  if(id==="reports")renderReports();
+  if(id==="reports")initReportsPeriod();
   if(id==="shelves")renderShelves();
   if(id==="social")renderSocial();
   if(id==="settings") {
@@ -1245,13 +1245,60 @@ function getExportData(){
   });
 }
 
+function isoToFin(iso){
+  if(!iso) return "";
+  const [y,m,day]=iso.split("-");
+  return `${Number(day)}.${Number(m)}.${y}`;
+}
+
+// Local-calendar-date ISO string — new Date(...).toISOString() converts to
+// UTC first, which rolls the date back a day in Finland's UTC+2/+3 zone.
+function localISO(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function setReportPeriod(kind){
+  const fromEl=document.getElementById("exportFrom"), toEl=document.getElementById("exportTo");
+  if(kind==="month"){
+    const d=new Date();
+    fromEl.value=localISO(new Date(d.getFullYear(), d.getMonth(), 1));
+    toEl.value=localISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
+  } else {
+    fromEl.value="";
+    toEl.value="";
+  }
+  renderReports();
+}
+
+// Only auto-scope the reports view to the current month the first time it's
+// opened in a session — after that, whatever period the user picked (incl.
+// "Kaikki ajat") sticks until reload instead of being reset on every visit.
+let reportsPeriodInitialized = false;
+function initReportsPeriod(){
+  if(reportsPeriodInitialized) { renderReports(); return; }
+  reportsPeriodInitialized = true;
+  setReportPeriod("month");
+}
+
 function renderReports(){
-  let d=getExportData(),total=jobs.length,delivered=jobs.filter(j=>j.status==="done").length,rev=jobs.reduce((a,j)=>a+(Number(j.price)||0),0);
-  document.getElementById("rTotal").textContent=total;
-  document.getElementById("rConverted").textContent=delivered;
-  document.getElementById("rPending").textContent=total-delivered;
-  document.getElementById("rConversion").textContent=(total?Math.round(delivered/total*100):0)+"% toimitettu";
-  document.getElementById("rRevenue").textContent="€"+rev;
+  let d=getExportData();
+  let delivered=d.filter(j=>j.status==="done"), pending=d.filter(j=>j.status!=="done");
+  let deliveredRevenue=delivered.reduce((a,j)=>a+(Number(j.price)||0),0);
+  let pendingRevenue=pending.reduce((a,j)=>a+(Number(j.price)||0),0);
+
+  document.getElementById("rTotal").textContent=d.length;
+  document.getElementById("rConverted").textContent=delivered.length;
+  document.getElementById("rDeliveredRevenue").textContent="€"+deliveredRevenue+" tuottoa";
+  document.getElementById("rPending").textContent=pending.length;
+  document.getElementById("rPendingRevenue").textContent="€"+pendingRevenue+" arvoltaan";
+
+  const fromVal=document.getElementById("exportFrom").value, toVal=document.getElementById("exportTo").value;
+  document.getElementById("rPeriodLabel").textContent = (fromVal||toVal) ? `${isoToFin(fromVal)||"…"} – ${isoToFin(toVal)||"…"}` : "Kaikki ajat";
+
+  // Today's still-open deliveries — always "today", regardless of the period filter above.
+  const todayDueJobs = jobs.filter(j => j.date===todayDateStr() && j.status!=="done");
+  document.getElementById("rDueTodayCount").textContent = todayDueJobs.length;
+  document.getElementById("rDueTodayRevenue").textContent = "€"+todayDueJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
 
   let src=document.getElementById("sourceStats"),sourceKeys=["store","whatsapp"],mx=Math.max(1,...sourceKeys.map(s=>jobs.filter(j=>(j.source||"store")===s).length));
   src.innerHTML=sourceKeys.map(s=>{let n=jobs.filter(j=>(j.source||"store")===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");

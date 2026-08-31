@@ -391,27 +391,31 @@
       </select>
     </label>
   </div>
+  <div style="display:flex; gap:8px; margin:12px 0 4px;">
+    <button class="export-btn" onclick="setReportPeriod('month')">📅 Tämä kuukausi</button>
+    <button class="export-btn" onclick="setReportPeriod('all')">Kaikki ajat</button>
+  </div>
 
   <div class="stats-grid">
     <div class="stat-card">
       <span>Yhteensä töitä</span>
       <strong id="rTotal">0</strong>
-      <small>Kaikki vastaanotetut työt</small>
+      <small id="rPeriodLabel">Valittu jakso</small>
     </div>
     <div class="stat-card">
-      <span>Luovutettu</span>
+      <span>Luovutettu (jakso)</span>
       <strong id="rConverted">0</strong>
-      <small id="rConversion">0% toimitettu</small>
+      <small id="rDeliveredRevenue">€0 tuottoa</small>
     </div>
     <div class="stat-card">
-      <span>Kesken</span>
+      <span>Odottaa toimitusta (jakso)</span>
       <strong id="rPending">0</strong>
-      <small>Ei vielä luovutettu</small>
+      <small id="rPendingRevenue">€0 arvoltaan</small>
     </div>
     <div class="stat-card">
-      <span>Kokonaistuotto</span>
-      <strong id="rRevenue">€0</strong>
-      <small>Töiden kokonaisarvo</small>
+      <span>Tänään toimitettavana</span>
+      <strong id="rDueTodayCount">0</strong>
+      <small id="rDueTodayRevenue">€0</small>
     </div>
   </div>
 
