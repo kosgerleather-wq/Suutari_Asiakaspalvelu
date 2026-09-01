@@ -362,6 +362,7 @@ document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dat
 function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<small>${statusLabel[j.status]||j.status}</small></div></div>`}
 
 function renderHome(){
+  updateHeaderDate();
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   renderMorningBrief();
   renderTodos();
@@ -1073,6 +1074,18 @@ function openNotificationModal(jobId, status) {
 }
 
 const monthNamesFi=["Tammikuu","Helmikuu","Maaliskuu","Huhtikuu","Toukokuu","Kesäkuu","Heinäkuu","Elokuu","Syyskuu","Lokakuu","Marraskuu","Joulukuu"];
+const dayNamesFi=["Sunnuntai","Maanantai","Tiistai","Keskiviikko","Torstai","Perjantai","Lauantai"];
+
+// The topbar date and home hero eyebrow used to be hard-coded in index.html
+// and never actually updated — always showed the day the template was last
+// authored, regardless of the real date.
+function updateHeaderDate(){
+  const d = new Date();
+  const dateStr = todayDateStr();
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+  set("topbarDate", dateStr);
+  set("homeEyebrowDate", `${dayNamesFi[d.getDay()]} · ${dateStr}`);
+}
 let calendarViewYear, calendarViewMonth;
 (function initCalendarView(){
   const now = new Date();
@@ -2112,7 +2125,8 @@ function renderMorningBrief() {
   }
 
   const items = [];
-  const todayStr = todayDateStr();
+  const afterClosingBrief = isAfterClosing();
+  const refStr = referenceDateStr();
 
   // 1. Myöhässä olevat (Late jobs)
   const lateJobsList = jobs.filter(j => j.status === "late");
@@ -2120,10 +2134,10 @@ function renderMorningBrief() {
     items.push(`🔴 <strong>${lateJobsList.length} työtä on myöhässä!</strong> Suosittelemme saattamaan nämä nopeasti valmiiksi.`);
   }
 
-  // 2. Tänään toimitettavat (Due today)
-  const dueTodayList = jobs.filter(j => j.date === todayStr && j.status !== "done" && j.status !== "ready");
+  // 2. Tänään/huomenna toimitettavat (Due today, or tomorrow after closing time)
+  const dueTodayList = jobs.filter(j => j.date === refStr && j.status !== "done" && j.status !== "ready");
   if (dueTodayList.length > 0) {
-    items.push(`📅 <strong>${dueTodayList.length} työ(tä) tulee luovuttaa tänään.</strong> Varmista, että nämä ovat valmiina.`);
+    items.push(`📅 <strong>${dueTodayList.length} työ(tä) tulee luovuttaa ${afterClosingBrief ? "huomenna" : "tänään"}.</strong> Varmista, että nämä ovat valmiina.`);
   }
 
   // 3. Riskiryhmä: Malzeme bekleyen acil işler (Waiting for material due within 2 days)
