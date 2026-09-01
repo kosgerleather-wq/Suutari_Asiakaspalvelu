@@ -380,6 +380,7 @@ function previewIntakeImage(e) {
       preview.style.objectFit = "cover";
       content.style.display = "none";
       intakeImageBase64 = await blobToDataURL(displayFile);
+      recognizeProductFromPhoto();
     } catch (err) {
       console.error("Image preview failed:", err);
       content.innerHTML = "⚠️ Kuvan lataus epäonnistui. Yritä valita kuva uudelleen.";
@@ -409,14 +410,18 @@ function openIntake(prefill=null){
     intakeImageBase64 = null;
   }
 
+  const suggestion = prefill?.date ? null : suggestDeliveryDate();
+  const dateValue = prefill?.date ? finDateToIso(prefill.date) : (suggestion ? suggestion.iso : "");
+  const dateHint = suggestion ? `📅 Ehdotettu vapaampi päivä (${suggestion.count} työtä sinä päivänä)` : "";
+
   document.getElementById("modalBody").innerHTML=`<h2>📦 Uusi vastaanotto</h2><p style="font-size:12px;color:#78858d">Asiakas toi tuotteen. Luo työ alle 10 sekunnissa.</p>
 <div class="form">
   <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi"></div>
   <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
-  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku"></div>
-  <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto"></div>
-  <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"></div>
-  <div class="field"><label>Toimitus</label><input id="date" type="date" value="2026-08-28"></div>
+  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
+  <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
+  <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
+  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
   <div class="field full">
     <label>Lähde</label>
@@ -443,6 +448,7 @@ function openIntake(prefill=null){
       </div>
       <img id="intakePreview" src="${prefill?.img||""}" style="${initialImgStyle}">
     </label>
+    <small id="photoRecognizeHint" style="display:none;color:var(--teal);font-weight:600;"></small>
   </div>
   <div class="field full"><label>Sisäinen huomautus</label><textarea id="note">${prefill?"Siirretty WhatsApp-tiedustelusta.":""}</textarea></div>
   <div class="field full"><label>Muistiinpano asiakkaalle <small style="font-weight:400;color:var(--text-muted);">(näkyy asiakkaan seurantasivulla)</small></label><textarea id="customerNote" placeholder="Esim. huomioita tuotteesta tai korjauksesta, jotka asiakkaan on hyvä tietää"></textarea></div>
@@ -532,6 +538,10 @@ async function saveJob(addAnother = false){
       document.getElementById("work").value = "";
       document.getElementById("price").value = "45";
       document.getElementById("note").value = "";
+      const priceHint = document.getElementById("priceHint");
+      if (priceHint) priceHint.style.display = "none";
+      const photoHint = document.getElementById("photoRecognizeHint");
+      if (photoHint) photoHint.style.display = "none";
 
       // Reset image
       intakeImageBase64 = null;
@@ -613,6 +623,136 @@ function parseFinDate(str){
   if(parts.length !== 3) return null;
   const d = new Date(+parts[2], +parts[1]-1, +parts[0]);
   return isNaN(d) ? null : d;
+}
+
+function finDateToIso(str){
+  const d = parseFinDate(str);
+  return d ? localISO(d) : "";
+}
+
+// Suggests the earliest upcoming date (starting 2 days out, for a minimum
+// realistic lead time) that isn't already near the shop's soft 6-jobs/day
+// capacity guideline (see calendarDensityClass) — so intake doesn't default
+// to stacking every new job onto whatever day is already busiest.
+function suggestDeliveryDate(){
+  const counts = jobCountsByDate();
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  for(let i=0; i<60; i++){
+    const dateStr = `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+    const count = counts[dateStr] || 0;
+    if(count <= 4) return { iso: localISO(d), fin: dateStr, count };
+    d.setDate(d.getDate()+1);
+  }
+  return null;
+}
+
+// Multi-model fallback list shared by the Gemini-backed AI helpers (social
+// captions, price estimates, photo recognition) — some models/API versions
+// aren't available on every key, so trying a few in order beats hard-coding one.
+const GEMINI_MODEL_TARGETS = [
+  { ver: "v1", model: "gemini-2.0-flash" },
+  { ver: "v1beta", model: "gemini-2.0-flash" },
+  { ver: "v1", model: "gemini-1.5-flash" },
+  { ver: "v1beta", model: "gemini-1.5-flash" },
+  { ver: "v1", model: "gemini-1.5-pro" },
+  { ver: "v1beta", model: "gemini-1.5-pro" }
+];
+
+async function callGemini(apiKey, parts){
+  for (const t of GEMINI_MODEL_TARGETS) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts }] })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidates && data.candidates[0]) {
+        return data.candidates[0].content.parts[0].text.trim();
+      }
+    } catch (err) {
+      console.warn(`Gemini model ${t.model} on ${t.ver} failed, trying next...`, err);
+    }
+  }
+  return null;
+}
+
+// Estimates a price from the shop's own price list (Asetukset → "Hinnasto &
+// ohjeet") once both Tuote and Korjaus have some text — only fills the price
+// field if it's still untouched (empty or the form's "45" default) so it
+// never silently overwrites a price staff already typed themselves.
+async function suggestPriceFromAI(){
+  const prodEl = document.getElementById("prod"), workEl = document.getElementById("work"), priceEl = document.getElementById("price");
+  const hint = document.getElementById("priceHint");
+  if(!prodEl || !workEl || !priceEl) return;
+  const product = prodEl.value.trim(), work = workEl.value.trim();
+  if(!product && !work) return;
+
+  const apiKey = localStorage.getItem("suutari_gemini_key");
+  if(!apiKey) return;
+
+  const priceList = localStorage.getItem("suutari_ai_instructions") || "";
+  if(hint){ hint.textContent = "🪄 AI arvioi hintaa..."; hint.style.display = "inline"; }
+
+  const prompt = `Olet suutari-ateljeen hinnoitteluavustaja. Ateljeen hinnasto ja ohjeet:
+${priceList || "(Ei erillistä hinnastoa annettu — käytä yleistä suomalaista suutari-ateljeen hintatasoa.)"}
+
+Asiakkaan tuote: "${product || "ei määritelty"}"
+Pyydetty korjaus: "${work || "ei määritelty"}"
+
+Vastaa AINOASTAAN yhdellä kokonaisluvulla euroina, ei valuuttamerkkiä eikä muuta tekstiä. Esim: 35`;
+
+  const text = await callGemini(apiKey, [{ text: prompt }]);
+  const match = text && text.match(/\d+/);
+  if(match){
+    const estimate = +match[0];
+    if(priceEl.value === "" || priceEl.value === "45") priceEl.value = estimate;
+    if(hint){ hint.textContent = `🪄 AI-arvio: €${estimate} (hinnaston perusteella)`; hint.style.display = "inline"; }
+  } else if(hint){
+    hint.style.display = "none";
+  }
+}
+
+// Identifies the product (and guesses a likely repair) from the just-uploaded
+// intake photo via Gemini vision — only fills fields the staff hasn't already
+// typed into, so a manual entry always wins over the AI guess.
+async function recognizeProductFromPhoto(){
+  const apiKey = localStorage.getItem("suutari_gemini_key");
+  const prodEl = document.getElementById("prod"), workEl = document.getElementById("work");
+  const hint = document.getElementById("photoRecognizeHint");
+  if(!apiKey || !intakeImageBase64 || !prodEl || !workEl) return;
+  if(prodEl.value.trim()) return; // staff already entered a product manually
+
+  const match = intakeImageBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+  if(!match) return;
+  const [, mimeType, base64Data] = match;
+  const priceList = localStorage.getItem("suutari_ai_instructions") || "";
+
+  if(hint){ hint.textContent = "🪄 AI tunnistaa tuotetta kuvasta..."; hint.style.display = "inline"; }
+
+  const prompt = `Olet suutari-ateljeen avustaja. Katso kuva tuotteesta (esim. kenkä, laukku, vaate). Vastaa AINOASTAAN tässä JSON-muodossa, ei muuta tekstiä eikä koodilohkoa:
+{"tuote": "lyhyt suomenkielinen tuotekuvaus, esim. Naisten nahkakengät tai Nahkainen käsilaukku", "korjaus": "todennäköisin tarvittava korjaus näkyvän kulumisen perusteella samoilla termeillä kuin hinnastossa, tai tyhjä merkkijono jos ei selvää tarvetta"}
+
+Ateljeen hinnasto ja yleiset palvelut (käytä samoja termejä jos mahdollista):
+${priceList || "(ei hinnastoa annettu)"}`;
+
+  const text = await callGemini(apiKey, [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Data } }]);
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text.replace(/^```(json)?\s*|```\s*$/g, "")) : null;
+  } catch (err) {
+    console.warn("Photo recognition response wasn't valid JSON:", text);
+  }
+
+  if(parsed?.tuote && !prodEl.value.trim()){
+    prodEl.value = parsed.tuote;
+    if(parsed.korjaus && !workEl.value.trim()) workEl.value = parsed.korjaus;
+    if(hint){ hint.textContent = `🪄 AI tunnisti: ${parsed.tuote}`; hint.style.display = "inline"; }
+    suggestPriceFromAI();
+  } else if(hint){
+    hint.style.display = "none";
+  }
 }
 
 function updateDeliveredStats(){
