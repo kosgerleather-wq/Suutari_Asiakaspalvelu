@@ -672,14 +672,19 @@ function suggestDeliveryDate(){
 
 // Multi-model fallback list shared by the Gemini-backed AI helpers (social
 // captions, price estimates, photo recognition) — some models/API versions
-// aren't available on every key, so trying a few in order beats hard-coding one.
+// aren't available on every key, so trying a few in order beats hard-coding
+// one. gemini-1.5-* has been retired by Google (confirmed via a live "model
+// not found" error on this key) — "-latest" aliases lead the list so this
+// doesn't go stale again as Google renames the current model.
 const GEMINI_MODEL_TARGETS = [
-  { ver: "v1", model: "gemini-2.0-flash" },
+  { ver: "v1beta", model: "gemini-flash-latest" },
+  { ver: "v1", model: "gemini-flash-latest" },
+  { ver: "v1beta", model: "gemini-2.5-flash" },
+  { ver: "v1", model: "gemini-2.5-flash" },
   { ver: "v1beta", model: "gemini-2.0-flash" },
-  { ver: "v1", model: "gemini-1.5-flash" },
-  { ver: "v1beta", model: "gemini-1.5-flash" },
-  { ver: "v1", model: "gemini-1.5-pro" },
-  { ver: "v1beta", model: "gemini-1.5-pro" }
+  { ver: "v1", model: "gemini-2.0-flash" },
+  { ver: "v1beta", model: "gemini-pro-latest" },
+  { ver: "v1", model: "gemini-pro-latest" }
 ];
 
 // Returns { text, error }: text is the model's reply on success; on total
@@ -1832,36 +1837,12 @@ Kirjoita mukaansatempaava ja ammattimainen sosiaalisen median julkaisuteksti (In
 
 Sisällytä tekstiin sopivia emojiyhdistelmiä (kuten 🔨, 🥾, 👜, ✨), osoite "Tehtaankatu 18, Helsinki" sekä suosittuja hashtageja (kuten #suutari #helsinki #kenkähuolto #nahkatyöt). Pidä sävy ystävällisenä, paikallisena ja laatuun keskittyvänä. Vastaa AINOASTAAN valmiilla julkaisutekstillä.`;
 
-  const targets = [
-    { ver: "v1", model: "gemini-2.0-flash" },
-    { ver: "v1beta", model: "gemini-2.0-flash" },
-    { ver: "v1", model: "gemini-1.5-flash" },
-    { ver: "v1beta", model: "gemini-1.5-flash" },
-    { ver: "v1", model: "gemini-1.5-pro" },
-    { ver: "v1beta", model: "gemini-1.5-pro" }
-  ];
   let success = false;
-  
-  for (const t of targets) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.candidates && data.candidates[0]) {
-        const caption = data.candidates[0].content.parts[0].text.trim();
-        document.getElementById("aiCaptionText").textContent = caption;
-        document.getElementById("aiCaptionCard").style.display = "block";
-        success = true;
-        break;
-      }
-    } catch (err) {
-      console.warn(`Social generator model ${t.model} on ${t.ver} failed, trying next...`, err);
-    }
+  const { text: caption } = await callGemini(apiKey, [{ text: prompt }]);
+  if (caption) {
+    document.getElementById("aiCaptionText").textContent = caption;
+    document.getElementById("aiCaptionCard").style.display = "block";
+    success = true;
   }
   
   if (!success) {
