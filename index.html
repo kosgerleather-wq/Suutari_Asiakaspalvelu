@@ -143,7 +143,7 @@
 
   <div class="stats">
     <div class="stat red" onclick="goHomeStat('needs-action')"><small>Toimenpiteitä tarvitaan</small><strong id="statActionsNeeded">0</strong><span>Tänään</span></div>
-    <div class="stat orange" onclick="goHomeStat('today')"><small>Toimitus tänään</small><strong id="statDueToday">0</strong><span>2 tunnin sisällä</span></div>
+    <div class="stat orange" onclick="goHomeStat('today')"><small id="statDueTodayLabel">Toimitus tänään</small><strong id="statDueToday">0</strong><span id="statDueTodaySpan">2 tunnin sisällä</span></div>
     <div class="stat blue" onclick="goHomeStat('active')"><small>Verstaalla</small><strong id="statInProgress">0</strong><span>Työn alla</span></div>
     <div class="stat teal" onclick="goHomeStat('ready')"><small>Valmis</small><strong id="statReady">0</strong><span>Asiakasta odotetaan</span></div>
     <div class="stat purple" onclick="goHomeStat('whatsapp-waiting')"><small>WhatsApp odottaa</small><strong id="statNewMsg">0</strong><span>Tuote ei vielä saapunut</span></div>
@@ -157,7 +157,7 @@
 
   <div class="two-col">
     <div class="card">
-      <div class="card-title"><h2>📦 Toimitus tänään</h2><span id="todayCount">0 työtä</span></div>
+      <div class="card-title"><h2 id="todayCardTitle">📦 Toimitus tänään</h2><span id="todayCount">0 työtä</span></div>
       <div id="today"></div>
     </div>
     <div style="display:flex; flex-direction:column; gap:20px;">
@@ -413,7 +413,7 @@
       <small id="rPendingRevenue">€0 arvoltaan</small>
     </div>
     <div class="stat-card">
-      <span>Tänään toimitettavana</span>
+      <span id="rDueTodayLabel">Tänään toimitettavana</span>
       <strong id="rDueTodayCount">0</strong>
       <small id="rDueTodayRevenue">€0</small>
     </div>
@@ -604,6 +604,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260901_0200"></script>
+<script src="app.js?v=20260901_2200"></script>
 </body>
 </html>

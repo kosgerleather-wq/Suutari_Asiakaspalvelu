@@ -130,22 +130,44 @@ function todayDateStr(){
   return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
 }
 
+// After the shop's closing time, "today's deliveries" is a done deal —
+// staff planning who's due in is really asking about tomorrow. Everywhere
+// that logic applies (home stats, the delivery list, the reports tile)
+// reads referenceDateStr() instead of todayDateStr() so they all flip
+// together; actual-outcome figures (revenue earned, jobs delivered today,
+// the calendar's "today" cell) stay on the real date.
+const CLOSING_HOUR = 18;
+function isAfterClosing(){
+  return new Date().getHours() >= CLOSING_HOUR;
+}
+function referenceDateStr(){
+  const d = new Date();
+  if(isAfterClosing()) d.setDate(d.getDate()+1);
+  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+}
+
 function updateBadges(){
   const lateJobs = jobs.filter(j=>j.status==="late").length;
   const activeJobs = jobs.filter(j=>j.status==="active").length;
   const readyJobs = jobs.filter(j=>j.status==="ready").length;
-  const dueTodayJobs = jobs.filter(j=>j.date===todayDateStr()).length;
-  const todayListCount = Math.min(jobs.length, 4);
+  const afterClosing = isAfterClosing();
+  const refDate = referenceDateStr();
+  const dueRefJobs = jobs.filter(j=>j.date===refDate);
   const whatsappWaiting = jobs.filter(j=>j.source==="whatsapp" && j.status==="waiting").length;
 
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
   const actionsNeeded = lateJobs + whatsappWaiting;
   set("statActionsNeeded", actionsNeeded);
-  set("statDueToday", dueTodayJobs);
+  set("statDueToday", dueRefJobs.length);
+  set("statDueTodayLabel", afterClosing ? "Toimitus huomenna" : "Toimitus tänään");
+  set("statDueTodaySpan", afterClosing ? "🌙 Kauppa on kiinni" : "2 tunnin sisällä");
   set("statInProgress", activeJobs);
   set("statReady", readyJobs);
   set("statNewMsg", whatsappWaiting);
-  set("todayCount", `${todayListCount} työtä`);
+  set("todayCardTitle", afterClosing ? "📦 Toimitus huomenna" : "📦 Toimitus tänään");
+  set("todayCount", `${dueRefJobs.length} työtä`);
+  const todayEl = document.getElementById("today");
+  if(todayEl) todayEl.innerHTML = dueRefJobs.map(jobLine).join("") || `<p class="empty-row" style="color:var(--text-muted);font-size:13px;padding:10px 0;">Ei ${afterClosing?"huomiselle":"tälle päivälle"} merkittyjä toimituksia.</p>`;
 
   // Daily business snapshot (Päivän tilanne): today's intake, ready backlog,
   // today's deliveries and the revenue those deliveries brought in.
@@ -341,7 +363,6 @@ function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><
 
 function renderHome(){
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
-  document.getElementById("today").innerHTML=jobs.slice(0,4).map(jobLine).join("");
   renderMorningBrief();
   renderTodos();
   updateBadges();
@@ -600,7 +621,6 @@ function setJobsFilterNote(text) {
 // filtered Työt view they summarize, instead of being static numbers.
 const HOME_STAT_NOTES = {
   "needs-action": "⚠️ Toimenpiteitä tarvitaan: myöhässä olevat työt ja odottavat WhatsApp-tilaukset.",
-  "today": "📦 Tänään toimitettavat työt.",
   "active": "🔧 Verstaalla: työn alla olevat (ja myöhässä olevat) työt.",
   "ready": "✅ Valmiit, asiakasta odottavat työt.",
   "whatsapp-waiting": "💬 WhatsApp-tilaukset, jotka odottavat tuotteen saapumista."
@@ -612,7 +632,9 @@ function goHomeStat(type) {
   chipButtons.forEach(b => b.classList.remove("active"));
   const chipIdx = chipIndexByFilter[type];
   if (chipIdx != null && chipButtons[chipIdx]) chipButtons[chipIdx].classList.add("active");
-  const note = HOME_STAT_NOTES[type] || "";
+  const note = type === "today"
+    ? (isAfterClosing() ? "📦 Huomenna toimitettavat työt." : "📦 Tänään toimitettavat työt.")
+    : (HOME_STAT_NOTES[type] || "");
   setJobsFilterNote(note ? `${note} <a href="#" onclick="setJobFilter('all', document.querySelector('#jobs .chips button')); return false;" style="color:var(--teal);">Näytä kaikki</a>` : "");
   showPage("jobs");
 }
@@ -810,7 +832,7 @@ function renderJobs(){
     return;
   }
   if(currentJobFilter === "today"){
-    a = a.filter(j => j.date === todayDateStr());
+    a = a.filter(j => j.date === referenceDateStr());
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
@@ -1435,10 +1457,14 @@ function renderReports(){
   const fromVal=document.getElementById("exportFrom").value, toVal=document.getElementById("exportTo").value;
   document.getElementById("rPeriodLabel").textContent = (fromVal||toVal) ? `${isoToFin(fromVal)||"…"} – ${isoToFin(toVal)||"…"}` : "Kaikki ajat";
 
-  // Today's still-open deliveries — always "today", regardless of the period filter above.
-  const todayDueJobs = jobs.filter(j => j.date===todayDateStr() && j.status!=="done");
-  document.getElementById("rDueTodayCount").textContent = todayDueJobs.length;
-  document.getElementById("rDueTodayRevenue").textContent = "€"+todayDueJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
+  // Still-open deliveries for the reference day — always "today" (or, after
+  // closing time, "tomorrow" — see referenceDateStr()), regardless of the
+  // period filter above.
+  const afterClosingReports = isAfterClosing();
+  const dueRefReportJobs = jobs.filter(j => j.date===referenceDateStr() && j.status!=="done");
+  document.getElementById("rDueTodayLabel").textContent = afterClosingReports ? "Huomenna toimitettavana" : "Tänään toimitettavana";
+  document.getElementById("rDueTodayCount").textContent = dueRefReportJobs.length;
+  document.getElementById("rDueTodayRevenue").textContent = "€"+dueRefReportJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
 
   let src=document.getElementById("sourceStats"),sourceKeys=["store","whatsapp"],mx=Math.max(1,...sourceKeys.map(s=>jobs.filter(j=>(j.source||"store")===s).length));
   src.innerHTML=sourceKeys.map(s=>{let n=jobs.filter(j=>(j.source||"store")===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");
