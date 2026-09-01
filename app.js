@@ -682,7 +682,13 @@ const GEMINI_MODEL_TARGETS = [
   { ver: "v1beta", model: "gemini-1.5-pro" }
 ];
 
+// Returns { text, error }: text is the model's reply on success; on total
+// failure (every model/version tried) text is null and error carries the
+// last API error message, so callers can show *why* it failed instead of
+// just silently going quiet — a silent failure looks identical to "nothing
+// happened" and is impossible to diagnose remotely.
 async function callGemini(apiKey, parts){
+  let lastError = "Tuntematon virhe";
   for (const t of GEMINI_MODEL_TARGETS) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/${t.ver}/models/${t.model}:generateContent?key=${apiKey}`, {
@@ -692,13 +698,16 @@ async function callGemini(apiKey, parts){
       });
       const data = await res.json();
       if (res.ok && data.candidates && data.candidates[0]) {
-        return data.candidates[0].content.parts[0].text.trim();
+        return { text: data.candidates[0].content.parts[0].text.trim(), error: null };
       }
+      lastError = data?.error?.message || `HTTP ${res.status}`;
+      console.warn(`Gemini model ${t.model} on ${t.ver} failed:`, lastError);
     } catch (err) {
+      lastError = err.message || String(err);
       console.warn(`Gemini model ${t.model} on ${t.ver} failed, trying next...`, err);
     }
   }
-  return null;
+  return { text: null, error: lastError };
 }
 
 // Estimates a price from the shop's own price list (Asetukset → "Hinnasto &
@@ -726,14 +735,16 @@ Pyydetty korjaus: "${work || "ei määritelty"}"
 
 Vastaa AINOASTAAN yhdellä kokonaisluvulla euroina, ei valuuttamerkkiä eikä muuta tekstiä. Esim: 35`;
 
-  const text = await callGemini(apiKey, [{ text: prompt }]);
+  const { text, error } = await callGemini(apiKey, [{ text: prompt }]);
   const match = text && text.match(/\d+/);
   if(match){
     const estimate = +match[0];
     if(priceEl.value === "" || priceEl.value === "45") priceEl.value = estimate;
-    if(hint){ hint.textContent = `🪄 AI-arvio: €${estimate} (hinnaston perusteella)`; hint.style.display = "inline"; }
+    if(hint){ hint.style.color = "var(--teal)"; hint.textContent = `🪄 AI-arvio: €${estimate} (hinnaston perusteella)`; hint.style.display = "inline"; }
   } else if(hint){
-    hint.style.display = "none";
+    hint.style.color = "#ef4444";
+    hint.textContent = `⚠️ AI-hinta-arvio epäonnistui: ${error || "tuntematon virhe"}`;
+    hint.style.display = "inline";
   }
 }
 
@@ -760,21 +771,25 @@ async function recognizeProductFromPhoto(){
 Ateljeen hinnasto ja yleiset palvelut (käytä samoja termejä jos mahdollista):
 ${priceList || "(ei hinnastoa annettu)"}`;
 
-  const text = await callGemini(apiKey, [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Data } }]);
+  const { text, error } = await callGemini(apiKey, [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Data } }]);
   let parsed = null;
+  let parseError = null;
   try {
     parsed = text ? JSON.parse(text.replace(/^```(json)?\s*|```\s*$/g, "")) : null;
   } catch (err) {
+    parseError = "vastaus ei ollut odotetussa muodossa";
     console.warn("Photo recognition response wasn't valid JSON:", text);
   }
 
   if(parsed?.tuote && !prodEl.value.trim()){
     prodEl.value = parsed.tuote;
     if(parsed.korjaus && !workEl.value.trim()) workEl.value = parsed.korjaus;
-    if(hint){ hint.textContent = `🪄 AI tunnisti: ${parsed.tuote}`; hint.style.display = "inline"; }
+    if(hint){ hint.style.color = "var(--teal)"; hint.textContent = `🪄 AI tunnisti: ${parsed.tuote}`; hint.style.display = "inline"; }
     suggestPriceFromAI();
   } else if(hint){
-    hint.style.display = "none";
+    hint.style.color = "#ef4444";
+    hint.textContent = `⚠️ Kuvan tunnistus epäonnistui: ${error || parseError || "tuntematon virhe"}`;
+    hint.style.display = "inline";
   }
 }
 
