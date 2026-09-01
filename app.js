@@ -673,18 +673,20 @@ function suggestDeliveryDate(){
 // Multi-model fallback list shared by the Gemini-backed AI helpers (social
 // captions, price estimates, photo recognition) — some models/API versions
 // aren't available on every key, so trying a few in order beats hard-coding
-// one. gemini-1.5-* has been retired by Google (confirmed via a live "model
-// not found" error on this key) — "-latest" aliases lead the list so this
-// doesn't go stale again as Google renames the current model.
+// one. gemini-1.5-*, gemini-2.0-flash and the "-latest" aliases have all
+// been retired by Google — this list was rebuilt from the actual model
+// list Asetukset → "Testaa AI-yhteys" returned for a real key (Sept 2026).
+// If AI features go quiet again, that button is the fastest way to see
+// what Google currently serves and refresh this list.
 const GEMINI_MODEL_TARGETS = [
-  { ver: "v1beta", model: "gemini-flash-latest" },
-  { ver: "v1", model: "gemini-flash-latest" },
+  { ver: "v1beta", model: "gemini-3.7-flash" },
+  { ver: "v1", model: "gemini-3.7-flash" },
+  { ver: "v1beta", model: "gemini-3.5-flash" },
+  { ver: "v1", model: "gemini-3.5-flash" },
   { ver: "v1beta", model: "gemini-2.5-flash" },
   { ver: "v1", model: "gemini-2.5-flash" },
-  { ver: "v1beta", model: "gemini-2.0-flash" },
-  { ver: "v1", model: "gemini-2.0-flash" },
-  { ver: "v1beta", model: "gemini-pro-latest" },
-  { ver: "v1", model: "gemini-pro-latest" }
+  { ver: "v1beta", model: "gemini-2.5-pro" },
+  { ver: "v1", model: "gemini-2.5-pro" }
 ];
 
 // Returns { text, error }: text is the model's reply on success; on total
