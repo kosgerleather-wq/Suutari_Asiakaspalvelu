@@ -853,7 +853,11 @@ async function evaluateWhatsappMessage(){
   const prompt = `Olet suutari-ateljeen WhatsApp-asiakaspalvelun avustaja. Ateljeen hinnasto ja ohjeet:
 ${priceList || "(Ei erillistä hinnastoa annettu — käytä yleistä suomalaista suutari-ateljeen hintatasoa.)"}
 
-Alla on asiakkaan WhatsAppilla lähettämä viesti. Arvioi siitä tuote, tarvittava korjaus ja hinta-arvio hinnaston perusteella, ja kirjoita asiakkaalle ystävällinen, ammattimainen Fince vastaus (kerro arvioitu hinta ja mahdollinen toimitusaika, pyydä tarvittaessa lisätietoa jos viesti on epäselvä). Vastaa AINOASTAAN tässä JSON-muodossa, ei muuta tekstiä eikä koodilohkoa:
+Alla on asiakkaan WhatsAppilla lähettämä viesti. Arvioi siitä tuote, tarvittava korjaus ja hinta-arvio hinnaston perusteella, ja kirjoita asiakkaalle Fince vastaus seuraavilla säännöillä:
+- Pidä vastaus lyhyenä ja yksinkertaisena, muutama lause riittää — ei pitkiä selityksiä.
+- Mainitse hinta-arvio VAIN jos asiakas kysyi hintaa viestissään. Jos asiakas ei kysynyt hintaa, älä mainitse sitä vastauksessa lainkaan.
+- Pyydä lisätietoa vain jos viesti on aidosti epäselvä.
+Vastaa AINOASTAAN tässä JSON-muodossa, ei muuta tekstiä eikä koodilohkoa:
 {"tuote": "lyhyt suomenkielinen tuotekuvaus, tai tyhjä merkkijono jos ei selviä viestistä", "korjaus": "pyydetty/tarvittava korjaus, tai tyhjä merkkijono jos ei selviä", "hinta": kokonaisluku euroina hinnaston perusteella, tai null jos arviointi ei ole mahdollista, "vastaus": "asiakkaalle lähetettävä valmis Fince WhatsApp-vastaus"}
 
 Asiakkaan viesti:
