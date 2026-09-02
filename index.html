@@ -115,9 +115,12 @@
       <h1>Verstaalla tänään</h1>
       <p>Kiireellisimmät ja tärkeimmät työt alla.</p>
     </div>
-    <button class="quick-add" onclick="openIntake()">＋ <span>UUSI VASTAANOTTO</span></button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="quick-add" onclick="openIntake()">＋ <span>UUSI VASTAANOTTO</span></button>
+      <button class="quick-add" style="background:var(--teal);box-shadow:0 8px 20px rgba(19,140,140,0.15);" onclick="openIntake({source:'whatsapp'})">💬 <span>WHATSAPP-TILAUS</span></button>
+    </div>
   </div>
-  
+
   <!-- Morning Brief (Päivän Briiffi) -->
   <div id="morningBrief" class="card" style="display:none; margin-bottom: 25px; border-left: 5px solid var(--teal); background: linear-gradient(135deg, rgba(19, 140, 140, 0.05) 0%, rgba(15, 45, 74, 0.02) 100%); padding: 20px;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -185,7 +188,10 @@
       <h1>Työt</h1>
       <p>Katso missä ja missä vaiheessa kukin tuote on.</p>
     </div>
-    <button class="quick-add" onclick="openIntake()">＋ UUSI VASTAANOTTO</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="quick-add" onclick="openIntake()">＋ UUSI VASTAANOTTO</button>
+      <button class="quick-add" style="background:var(--teal);box-shadow:0 8px 20px rgba(19,140,140,0.15);" onclick="openIntake({source:'whatsapp'})">💬 WHATSAPP-TILAUS</button>
+    </div>
   </div>
   <div class="toolbar">
     <input id="search" placeholder="⌕ Etsi asiakasta, työtä tai tuotetta..." oninput="renderJobs()">
@@ -604,6 +610,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260902_1200"></script>
+<script src="app.js?v=20260902_1400"></script>
 </body>
 </html>

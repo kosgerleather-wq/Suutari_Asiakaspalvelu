@@ -496,7 +496,10 @@ function openIntake(prefill=null){
     <small id="photoRecognizeHint" style="display:none;color:var(--teal);font-weight:600;"></small>
   </div>
   <div class="field full"><label>Sisäinen huomautus</label><textarea id="note">${prefill?"Siirretty WhatsApp-tiedustelusta.":""}</textarea></div>
-  <div class="field full"><label>Muistiinpano asiakkaalle <small style="font-weight:400;color:var(--text-muted);">(näkyy asiakkaan seurantasivulla)</small></label><textarea id="customerNote" placeholder="Esim. huomioita tuotteesta tai korjauksesta, jotka asiakkaan on hyvä tietää"></textarea></div>
+  <div class="field full"><label>Muistiinpano asiakkaalle <small style="font-weight:400;color:var(--text-muted);">(näkyy asiakkaan seurantasivulla)</small></label><textarea id="customerNote" placeholder="Esim. huomioita tuotteesta tai korjauksesta, jotka asiakkaan on hyvä tietää"></textarea>
+    <button type="button" class="save" style="margin-top:6px;background:var(--primary-light);color:var(--primary);border:0;" onclick="copyCustomerNote()">📋 Kopioi vastaus WhatsAppiin</button>
+    <small id="copyCustomerNoteHint" style="display:none;color:var(--teal);font-weight:600;"></small>
+  </div>
 </div>
 <div class="modal-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
   <button class="cancel" onclick="closeModal()">Peruuta</button>
@@ -888,6 +891,29 @@ ${pasted}
       hint.textContent = "⚠️ Viestistä ei löytynyt tuotetta, hintaa tai vastausta.";
     }
     hint.style.display = "inline";
+  }
+}
+
+// One-click copy of the drafted (or manually written) customer reply, so
+// staff can paste it straight into WhatsApp instead of selecting/copying
+// the textarea text by hand.
+async function copyCustomerNote(){
+  const noteEl = document.getElementById("customerNote");
+  const hint = document.getElementById("copyCustomerNoteHint");
+  const text = noteEl?.value.trim();
+  if(!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    noteEl.select();
+    document.execCommand("copy");
+  }
+
+  if(hint){
+    hint.textContent = "✓ Kopioitu leikepöydälle";
+    hint.style.display = "inline";
+    setTimeout(() => { hint.style.display = "none"; }, 2500);
   }
 }
 
