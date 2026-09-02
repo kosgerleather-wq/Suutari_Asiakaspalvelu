@@ -465,9 +465,9 @@ function openIntake(prefill=null){
     </select>
   </div>
   <div id="whatsappTrackingField" class="field full" style="display:${prefill?.source==="whatsapp"?"block":"none"};">
-    <label>Asiakkaan WhatsApp-viesti</label>
-    <textarea id="whatsappMsgPaste" rows="4" placeholder="Liitä tähän asiakkaan WhatsApp-viesti sellaisenaan — AI arvioi tuotteen, hinnan ja kirjoittaa Fince vastauksen hinnaston perusteella"></textarea>
-    <button type="button" class="save" style="margin-top:6px;background:var(--teal);color:white;border:0;" onclick="evaluateWhatsappMessage()">🪄 Arvioi viesti ja täytä lomake</button>
+    <label>Asiakkaan WhatsApp-viesti <small style="font-weight:400;color:var(--text-muted);">(valinnainen jos lisäät kuvan alla)</small></label>
+    <textarea id="whatsappMsgPaste" rows="4" placeholder="Liitä tähän asiakkaan WhatsApp-viesti sellaisenaan. Voit jättää tyhjäksi jos arvioit pelkän kuvan perusteella."></textarea>
+    <button type="button" class="save" style="margin-top:6px;background:var(--teal);color:white;border:0;" onclick="evaluateWhatsappMessage()">🪄 Arvioi ja täytä lomake (viesti ja/tai kuva)</button>
     <small id="whatsappMsgHint" style="display:none;font-weight:600;"></small>
     <label style="margin-top:14px;">WhatsApp-seuranta</label>
     <select id="whatsappStage">
@@ -827,19 +827,25 @@ ${priceList || "(ei hinnastoa annettu)"}`;
   }
 }
 
-// Lets staff paste the customer's raw incoming WhatsApp message and have
-// Gemini do the same job the shop's trained Claude skill was doing by hand:
-// read the message, estimate product/repair/price from the shop's own price
-// list, and draft a Finnish reply — filling the intake fields directly so a
-// new WhatsApp job goes from "message received" to "ready to save" in one
-// step. Overwrites Tuote/Korjaus/Hinta/Muistiinpano asiakkaalle outright
-// since this is an explicit "evaluate this message" click, unlike the
-// passive onblur/photo helpers that only fill blank fields.
+// Lets staff evaluate a WhatsApp order from whichever inputs they have —
+// the customer's pasted message text, an uploaded product photo, or both —
+// doing the same job the shop's trained Claude skill was doing by hand:
+// estimate product/repair/price from the shop's own price list and draft a
+// Finnish reply, filling the intake fields directly. Neither input is
+// required on its own; if both are present they're sent together for a
+// more accurate combined read. Overwrites Tuote/Korjaus/Hinta/Muistiinpano
+// asiakkaalle outright since this is an explicit "evaluate this" click,
+// unlike the passive onblur/photo helpers that only fill blank fields.
 async function evaluateWhatsappMessage(){
   const pasteEl = document.getElementById("whatsappMsgPaste");
   const hint = document.getElementById("whatsappMsgHint");
-  const pasted = pasteEl?.value.trim();
-  if(!pasted) return;
+  const pasted = pasteEl?.value.trim() || "";
+  const imageMatch = intakeImageBase64?.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+
+  if(!pasted && !imageMatch){
+    if(hint){ hint.style.color = "#ef4444"; hint.textContent = "⚠️ Liitä viesti tai lisää kuva ensin."; hint.style.display = "inline"; }
+    return;
+  }
 
   const apiKey = localStorage.getItem("suutari_gemini_key");
   if(!apiKey){
@@ -847,37 +853,37 @@ async function evaluateWhatsappMessage(){
     return;
   }
 
-  if(hint){ hint.style.color = "var(--teal)"; hint.textContent = "🪄 Arvioidaan viestiä..."; hint.style.display = "inline"; }
+  if(hint){ hint.style.color = "var(--teal)"; hint.textContent = "🪄 Arvioidaan..."; hint.style.display = "inline"; }
 
   const priceList = localStorage.getItem("suutari_ai_instructions") || "";
   const prompt = `Olet suutari-ateljeen WhatsApp-asiakaspalvelun avustaja. Ateljeen hinnasto ja ohjeet:
 ${priceList || "(Ei erillistä hinnastoa annettu — käytä yleistä suomalaista suutari-ateljeen hintatasoa.)"}
 
-Alla on asiakkaan WhatsAppilla lähettämä viesti. Arvioi siitä tuote, tarvittava korjaus ja hinta-arvio hinnaston perusteella, ja kirjoita asiakkaalle Fince vastaus seuraavilla säännöillä:
+Käytössäsi on asiakkaan WhatsApp-viesti, kuva tuotteesta, tai molemmat — käytä kaikkea mitä on saatavilla. Arvioi tuote, tarvittava korjaus ja hinta-arvio hinnaston perusteella, ja kirjoita asiakkaalle Fince vastaus seuraavilla säännöillä:
 - Pidä vastaus lyhyenä ja yksinkertaisena, muutama lause riittää — ei pitkiä selityksiä.
-- Mainitse hinta-arvio VAIN jos asiakas kysyi hintaa viestissään. Jos asiakas ei kysynyt hintaa, älä mainitse sitä vastauksessa lainkaan.
-- Pyydä lisätietoa vain jos viesti on aidosti epäselvä.
+- Mainitse hinta-arvio VAIN jos asiakas kysyi hintaa viestissään. Jos asiakas ei kysynyt hintaa (tai viestiä ei ole), älä mainitse sitä vastauksessa lainkaan.
+- Pyydä lisätietoa vain jos tiedot ovat aidosti riittämättömät.
 - Aloita lyhyellä ystävällisellä tervehdyksellä (esim. "Hei!") ja lopeta vastaus rivillä "Ystävällisin terveisin, Suutari".
 Vastaa AINOASTAAN tässä JSON-muodossa, ei muuta tekstiä eikä koodilohkoa:
-{"tuote": "lyhyt suomenkielinen tuotekuvaus, tai tyhjä merkkijono jos ei selviä viestistä", "korjaus": "pyydetty/tarvittava korjaus, tai tyhjä merkkijono jos ei selviä", "hinta": kokonaisluku euroina hinnaston perusteella, tai null jos arviointi ei ole mahdollista, "vastaus": "asiakkaalle lähetettävä valmis Fince WhatsApp-vastaus"}
+{"tuote": "lyhyt suomenkielinen tuotekuvaus, tai tyhjä merkkijono jos ei selviä", "korjaus": "pyydetty/tarvittava korjaus, tai tyhjä merkkijono jos ei selviä", "hinta": kokonaisluku euroina hinnaston perusteella, tai null jos arviointi ei ole mahdollista, "vastaus": "asiakkaalle lähetettävä valmis Fince WhatsApp-vastaus"}
 
-Asiakkaan viesti:
-"""
-${pasted}
-"""`;
+${pasted ? `Asiakkaan viesti:\n"""\n${pasted}\n"""` : "(Asiakkaalta ei ole viestitekstiä — arvioi pelkän kuvan perusteella.)"}`;
 
-  const { text, error } = await callGemini(apiKey, [{ text: prompt }]);
+  const parts = [{ text: prompt }];
+  if(imageMatch) parts.push({ inline_data: { mime_type: imageMatch[1], data: imageMatch[2] } });
+
+  const { text, error } = await callGemini(apiKey, parts);
   let parsed = null;
   let parseError = null;
   try {
     parsed = text ? JSON.parse(text.replace(/^```(json)?\s*|```\s*$/g, "")) : null;
   } catch (err) {
     parseError = "vastaus ei ollut odotetussa muodossa";
-    console.warn("WhatsApp message evaluation response wasn't valid JSON:", text);
+    console.warn("WhatsApp evaluation response wasn't valid JSON:", text);
   }
 
   if(!parsed){
-    if(hint){ hint.style.color = "#ef4444"; hint.textContent = `⚠️ Viestin arviointi epäonnistui: ${error || parseError || "tuntematon virhe"}`; hint.style.display = "inline"; }
+    if(hint){ hint.style.color = "#ef4444"; hint.textContent = `⚠️ Arviointi epäonnistui: ${error || parseError || "tuntematon virhe"}`; hint.style.display = "inline"; }
     return;
   }
 
@@ -893,7 +899,7 @@ ${pasted}
       hint.textContent = `🪄 Täytetty: ${filled.join(", ")}. Tarkista tiedot ja hinta ennen tallennusta ja lähettämistä.`;
     } else {
       hint.style.color = "#ef4444";
-      hint.textContent = "⚠️ Viestistä ei löytynyt tuotetta, hintaa tai vastausta.";
+      hint.textContent = "⚠️ Tuotetta, hintaa tai vastausta ei löytynyt.";
     }
     hint.style.display = "inline";
   }
