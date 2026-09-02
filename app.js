@@ -414,10 +414,29 @@ function previewIntakeImage(e) {
   })();
 }
 
+// WhatsApp orders are tracked by a "Wxxxx" ticket number, typed into the
+// same Asiakas field walk-in customers' name goes in (see get_jobs_by_ticket
+// — the customer looks this number up on the tracking page later). Staff
+// used to type the next number by hand ("started at W1001, we're at W1012
+// now") — this finds the highest existing Wxxxx across all jobs and
+// suggests the next one automatically instead.
+function nextWhatsappNumber(){
+  const nums = jobs
+    .map(j => /^W(\d+)$/i.exec(String(j.name || "").trim()))
+    .filter(Boolean)
+    .map(m => +m[1]);
+  const next = nums.length ? Math.max(...nums) + 1 : 1001;
+  return "W" + next;
+}
+
 function toggleWhatsappTracking(){
   const source = document.getElementById("source")?.value;
   const field = document.getElementById("whatsappTrackingField");
   if(field) field.style.display = source === "whatsapp" ? "block" : "none";
+  if(source === "whatsapp"){
+    const nameEl = document.getElementById("n");
+    if(nameEl && !nameEl.value.trim()) nameEl.value = nextWhatsappNumber();
+  }
 }
 
 function openIntake(prefill=null){
@@ -438,13 +457,6 @@ function openIntake(prefill=null){
 
   document.getElementById("modalBody").innerHTML=`<h2>📦 Uusi vastaanotto</h2><p style="font-size:12px;color:#78858d">Asiakas toi tuotteen. Luo työ alle 10 sekunnissa.</p>
 <div class="form">
-  <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi"></div>
-  <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
-  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
-  <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
-  <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
-  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
-  <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
   <div class="field full">
     <label>Lähde</label>
     <select id="source" onchange="toggleWhatsappTracking()">
@@ -460,6 +472,13 @@ function openIntake(prefill=null){
       <option value="done">✔ Toimitettu</option>
     </select>
   </div>
+  <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi"></div>
+  <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
+  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
+  <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
+  <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
+  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
+  <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
   <div class="field full">
     <label>Kuva</label>
     <label class="dropzone" id="intakeDropzone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: var(--bg); min-height: 100px; position: relative;">
@@ -481,6 +500,7 @@ function openIntake(prefill=null){
   <button class="save" onclick="saveJob(false)" style="background:var(--primary); color:white; border:0;">TALLENNA & VALMIS</button>
 </div>`;
   document.getElementById("modal").classList.remove("hidden");
+  toggleWhatsappTracking();
 }
 
 async function saveJob(addAnother = false){
