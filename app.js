@@ -465,7 +465,11 @@ function openIntake(prefill=null){
     </select>
   </div>
   <div id="whatsappTrackingField" class="field full" style="display:${prefill?.source==="whatsapp"?"block":"none"};">
-    <label>WhatsApp-seuranta</label>
+    <label>Asiakkaan WhatsApp-viesti</label>
+    <textarea id="whatsappMsgPaste" rows="4" placeholder="Liitä tähän asiakkaan WhatsApp-viesti sellaisenaan — AI arvioi tuotteen, hinnan ja kirjoittaa Fince vastauksen hinnaston perusteella"></textarea>
+    <button type="button" class="save" style="margin-top:6px;background:var(--teal);color:white;border:0;" onclick="evaluateWhatsappMessage()">🪄 Arvioi viesti ja täytä lomake</button>
+    <small id="whatsappMsgHint" style="display:none;font-weight:600;"></small>
+    <label style="margin-top:14px;">WhatsApp-seuranta</label>
     <select id="whatsappStage">
       <option value="waiting">⏳ Odottaa (tuote ei vielä saapunut)</option>
       <option value="arrived">📦 Tuote saapui</option>
@@ -816,6 +820,73 @@ ${priceList || "(ei hinnastoa annettu)"}`;
   } else if(hint){
     hint.style.color = "#ef4444";
     hint.textContent = `⚠️ Kuvan tunnistus epäonnistui: ${error || parseError || "tuntematon virhe"}`;
+    hint.style.display = "inline";
+  }
+}
+
+// Lets staff paste the customer's raw incoming WhatsApp message and have
+// Gemini do the same job the shop's trained Claude skill was doing by hand:
+// read the message, estimate product/repair/price from the shop's own price
+// list, and draft a Finnish reply — filling the intake fields directly so a
+// new WhatsApp job goes from "message received" to "ready to save" in one
+// step. Overwrites Tuote/Korjaus/Hinta/Muistiinpano asiakkaalle outright
+// since this is an explicit "evaluate this message" click, unlike the
+// passive onblur/photo helpers that only fill blank fields.
+async function evaluateWhatsappMessage(){
+  const pasteEl = document.getElementById("whatsappMsgPaste");
+  const hint = document.getElementById("whatsappMsgHint");
+  const pasted = pasteEl?.value.trim();
+  if(!pasted) return;
+
+  const apiKey = localStorage.getItem("suutari_gemini_key");
+  if(!apiKey){
+    if(hint){ hint.style.color = "#ef4444"; hint.textContent = "⚠️ Aseta ensin Gemini-avain (Asetukset)."; hint.style.display = "inline"; }
+    return;
+  }
+
+  if(hint){ hint.style.color = "var(--teal)"; hint.textContent = "🪄 Arvioidaan viestiä..."; hint.style.display = "inline"; }
+
+  const priceList = localStorage.getItem("suutari_ai_instructions") || "";
+  const prompt = `Olet suutari-ateljeen WhatsApp-asiakaspalvelun avustaja. Ateljeen hinnasto ja ohjeet:
+${priceList || "(Ei erillistä hinnastoa annettu — käytä yleistä suomalaista suutari-ateljeen hintatasoa.)"}
+
+Alla on asiakkaan WhatsAppilla lähettämä viesti. Arvioi siitä tuote, tarvittava korjaus ja hinta-arvio hinnaston perusteella, ja kirjoita asiakkaalle ystävällinen, ammattimainen Fince vastaus (kerro arvioitu hinta ja mahdollinen toimitusaika, pyydä tarvittaessa lisätietoa jos viesti on epäselvä). Vastaa AINOASTAAN tässä JSON-muodossa, ei muuta tekstiä eikä koodilohkoa:
+{"tuote": "lyhyt suomenkielinen tuotekuvaus, tai tyhjä merkkijono jos ei selviä viestistä", "korjaus": "pyydetty/tarvittava korjaus, tai tyhjä merkkijono jos ei selviä", "hinta": kokonaisluku euroina hinnaston perusteella, tai null jos arviointi ei ole mahdollista, "vastaus": "asiakkaalle lähetettävä valmis Fince WhatsApp-vastaus"}
+
+Asiakkaan viesti:
+"""
+${pasted}
+"""`;
+
+  const { text, error } = await callGemini(apiKey, [{ text: prompt }]);
+  let parsed = null;
+  let parseError = null;
+  try {
+    parsed = text ? JSON.parse(text.replace(/^```(json)?\s*|```\s*$/g, "")) : null;
+  } catch (err) {
+    parseError = "vastaus ei ollut odotetussa muodossa";
+    console.warn("WhatsApp message evaluation response wasn't valid JSON:", text);
+  }
+
+  if(!parsed){
+    if(hint){ hint.style.color = "#ef4444"; hint.textContent = `⚠️ Viestin arviointi epäonnistui: ${error || parseError || "tuntematon virhe"}`; hint.style.display = "inline"; }
+    return;
+  }
+
+  const filled = [];
+  if(parsed.tuote){ document.getElementById("prod").value = parsed.tuote; filled.push("tuote"); }
+  if(parsed.korjaus){ document.getElementById("work").value = parsed.korjaus; filled.push("korjaus"); }
+  if(parsed.hinta != null){ document.getElementById("price").value = parsed.hinta; filled.push("hinta"); }
+  if(parsed.vastaus){ document.getElementById("customerNote").value = parsed.vastaus; filled.push("vastaus asiakkaalle"); }
+
+  if(hint){
+    if(filled.length){
+      hint.style.color = "var(--teal)";
+      hint.textContent = `🪄 Täytetty: ${filled.join(", ")}. Tarkista tiedot ja hinta ennen tallennusta ja lähettämistä.`;
+    } else {
+      hint.style.color = "#ef4444";
+      hint.textContent = "⚠️ Viestistä ei löytynyt tuotetta, hintaa tai vastausta.";
+    }
     hint.style.display = "inline";
   }
 }
