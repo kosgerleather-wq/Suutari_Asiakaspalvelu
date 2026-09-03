@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2.0.4">
+<link rel="stylesheet" href="styles.css?v=2.0.5">
 </head>
 <body>
 
@@ -88,7 +88,7 @@
     <button class="active" data-page="home">⌂ <span>Tänään</span></button>
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
-    <button data-page="social">📢 <span>Sosiaalinen Media</span></button>
+    <!-- Sosiaalinen Media -- pasivoitu toistaiseksi, sivu ja koodi ennallaan odottamassa jatkokehitystä -->
     <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
     <button data-page="customers">♙ <span>Asiakkaat</span></button>
   </nav>
@@ -201,6 +201,17 @@
       <button onclick="setJobFilter('waiting', this)">Odottaa</button>
       <button onclick="setJobFilter('ready', this)">Valmis</button>
       <button onclick="setJobFilter('done', this)">✔ Teslim edildi</button>
+    </div>
+    <button id="bulkModeBtn" class="bulk-toggle-btn" onclick="toggleBulkMode()">☑ Toplu muokkaus</button>
+  </div>
+  <div id="bulkActionBar" class="bulk-bar" style="display:none;">
+    <span id="bulkCount">0 valittu</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="wide-btn" onclick="bulkSetStatus('waiting')">⏳ Odottaa</button>
+      <button class="wide-btn" onclick="bulkSetStatus('active')">🔧 Työn alla</button>
+      <button class="wide-btn" onclick="bulkSetStatus('ready')">✅ Valmis</button>
+      <button class="wide-btn" onclick="bulkSetStatus('done')">✔ Toimitettu</button>
+      <button class="wide-btn" onclick="clearJobSelection()">Peruuta</button>
     </div>
   </div>
   <p id="jobsFilterNote" style="font-size:12px;color:var(--primary);font-weight:600;margin:0 0 8px;"></p>
@@ -609,7 +620,9 @@
   </div>
 </div>
 
+<div id="printReceipt"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260902_1700"></script>
+<script src="app.js?v=20260903_2340"></script>
 </body>
 </html>

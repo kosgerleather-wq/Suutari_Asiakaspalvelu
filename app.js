@@ -613,13 +613,14 @@ async function saveJob(addAnother = false){
       feedback.style.marginTop = "15px";
       feedback.style.textAlign = "center";
       feedback.id = "intakeFeedback";
-      feedback.textContent = `✓ Työ tallennettu! Seurantakoodi: ${j.id}. Voit syöttää seuraavan tuotteen.`;
+      feedback.innerHTML = `✓ Työ tallennettu! Seurantakoodi: ${j.id}. Voit syöttää seuraavan tuotteen.<br>
+        <button type="button" class="wide-btn" style="margin-top:8px;max-width:220px;" onclick="printReceipt('${j.id}')">🖨️ Tulosta kuitti</button>`;
 
       const existingFeedback = document.getElementById("intakeFeedback");
       if (existingFeedback) existingFeedback.remove();
 
       document.querySelector(".modal-box").appendChild(feedback);
-      setTimeout(() => { if(feedback) feedback.remove(); }, 5000);
+      setTimeout(() => { if(feedback) feedback.remove(); }, 8000);
     } else {
       closeModal();
       openJob(j.id);
@@ -632,6 +633,67 @@ async function saveJob(addAnother = false){
 }
 
 let currentJobFilter = "all";
+
+// Lets staff select several jobs in the Työt list and change their status
+// (e.g. "Valmis" / "Toimitettu") in one tap, instead of opening each job's
+// full detail page to update it one at a time.
+let bulkMode = false;
+let selectedJobIds = new Set();
+
+function toggleBulkMode() {
+  bulkMode = !bulkMode;
+  if (!bulkMode) selectedJobIds.clear();
+  const btn = document.getElementById("bulkModeBtn");
+  if (btn) {
+    btn.textContent = bulkMode ? "✕ Sulje toplu muokkaus" : "☑ Toplu muokkaus";
+    btn.classList.toggle("active", bulkMode);
+  }
+  updateBulkBar();
+  renderJobs();
+}
+
+function toggleJobSelect(id, checked) {
+  if (checked) selectedJobIds.add(id); else selectedJobIds.delete(id);
+  updateBulkBar();
+}
+
+function clearJobSelection() {
+  selectedJobIds.clear();
+  updateBulkBar();
+  renderJobs();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById("bulkActionBar");
+  const count = document.getElementById("bulkCount");
+  if (!bar || !count) return;
+  bar.style.display = bulkMode && selectedJobIds.size > 0 ? "flex" : "none";
+  count.textContent = `${selectedJobIds.size} valittu`;
+}
+
+// Applies a status to every selected job at once, without opening each
+// job's detail/customer view — same status change setStatus() does per job,
+// just batched.
+function bulkSetStatus(status) {
+  if (selectedJobIds.size === 0) return;
+  selectedJobIds.forEach(id => {
+    const j = jobs.find(x => x.id === id);
+    if (!j) return;
+    j.status = status;
+    if (status === "done" && !j.delivered_at) {
+      j.delivered_at = new Date().toISOString();
+      dbUpdateJob(id, { status, delivered_at: j.delivered_at });
+    } else {
+      dbUpdateJobStatus(id, status);
+    }
+  });
+  saveState();
+  selectedJobIds.clear();
+  updateBulkBar();
+  renderHome();
+  renderJobs();
+}
+
 function setJobFilter(filter, btn) {
   currentJobFilter = filter;
   document.querySelectorAll("#jobs .chips button").forEach(x => x.classList.remove("active"));
@@ -950,9 +1012,20 @@ function renderJobs(){
   let q=(document.getElementById("search")?.value||"").toLowerCase();
   let a=jobs.filter(j=>(j.id+j.name+j.product+j.work).toLowerCase().includes(q));
 
-  const tableHead = `<div class="table-head"><div>Nro</div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
-  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id}</b></div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div><span class="pill ${statusPillClass(j.status)}">${statusLabel[j.status]||j.status}</span></div></div>`;
+  const checkboxCell = j => bulkMode ? `<div onclick="event.stopPropagation()"><input type="checkbox" class="job-row-check" ${selectedJobIds.has(j.id)?"checked":""} onchange="toggleJobSelect('${j.id}', this.checked)"></div>` : "";
+  const tableHead = `<div class="table-head">${bulkMode?"<div></div>":""}<div></div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
+  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`;
   const empty = `<p style="text-align:center;color:var(--text-muted);padding:30px 0;">Ei töitä.</p>`;
+  document.getElementById("jobsTable").classList.toggle("bulk-mode", bulkMode);
+  // Delivery dates in the past or today surface first — those are the ones
+  // staff need to act on; further-out jobs can wait further down the list.
+  const byDeliveryUrgency = (x,y) => {
+    const dx = parseFinDate(x.date), dy = parseFinDate(y.date);
+    if(!dx && !dy) return 0;
+    if(!dx) return 1;
+    if(!dy) return -1;
+    return dx - dy;
+  };
 
   updateDeliveredStats();
 
@@ -963,22 +1036,22 @@ function renderJobs(){
     return;
   }
   if(currentJobFilter === "active"){
-    a = a.filter(j => j.status === "active" || j.status === "late");
+    a = a.filter(j => j.status === "active" || j.status === "late").sort(byDeliveryUrgency);
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
   if(currentJobFilter === "waiting"){
-    a = a.filter(j => j.status === "waiting" || j.status === "arrived");
+    a = a.filter(j => j.status === "waiting" || j.status === "arrived").sort(byDeliveryUrgency);
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
   if(currentJobFilter === "ready"){
-    a = a.filter(j => j.status === "ready");
+    a = a.filter(j => j.status === "ready").sort(byDeliveryUrgency);
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
   if(currentJobFilter === "needs-action"){
-    a = a.filter(j => j.status === "late" || (j.source === "whatsapp" && j.status === "waiting"));
+    a = a.filter(j => j.status === "late" || (j.source === "whatsapp" && j.status === "waiting")).sort(byDeliveryUrgency);
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
@@ -988,16 +1061,16 @@ function renderJobs(){
     return;
   }
   if(currentJobFilter === "whatsapp-waiting"){
-    a = a.filter(j => j.source === "whatsapp" && j.status === "waiting");
+    a = a.filter(j => j.source === "whatsapp" && j.status === "waiting").sort(byDeliveryUrgency);
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
 
   // "Kaikki" — grouped by stage, delivered jobs excluded from this default view
   const groups = [
-    ["⏳ Odottaa", a.filter(j => j.status === "waiting" || j.status === "arrived")],
-    ["🔧 Työn alla", a.filter(j => j.status === "active" || j.status === "late")],
-    ["✅ Valmis", a.filter(j => j.status === "ready")]
+    ["⏳ Odottaa", a.filter(j => j.status === "waiting" || j.status === "arrived").sort(byDeliveryUrgency)],
+    ["🔧 Työn alla", a.filter(j => j.status === "active" || j.status === "late").sort(byDeliveryUrgency)],
+    ["✅ Valmis", a.filter(j => j.status === "ready").sort(byDeliveryUrgency)]
   ].filter(([,list]) => list.length);
 
   document.getElementById("jobsTable").innerHTML = groups.length ? groups.map(([title,list])=>
@@ -1071,11 +1144,54 @@ function openJob(id){
     <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${jobTimelineHtml(j)}</div>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer" onclick="openStatus('${j.id}')">PÄIVITÄ TILA</button>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--primary-light);color:var(--primary);" onclick="openEditJob('${j.id}')">✏️ MUOKKAA TIETOJA</button>
+      <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--teal-light);color:var(--teal);" onclick="printReceipt('${j.id}')">🖨️ TULOSTA KUITTI</button>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--teal-light);color:var(--teal);" onclick="addAnotherProductForCustomer('${j.id}')">➕ LISÄÄ UUSI TUOTE TÄLLE ASIAKKAALLE</button>
       <button class="delete-btn" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:#ef4444;color:white;font-weight:600;" onclick="deleteJob('${j.id}')">🗑️ POISTA TYÖ</button>
     </div>
   </div>`;
   showPage("job");
+}
+
+// Fills the hidden #printReceipt container with a formatted 80mm receipt
+// and triggers the browser's native print dialog, which lists whatever
+// printer is already installed on the device (tablet or computer) — no
+// printer-specific code needed here.
+function buildReceiptHtml(j){
+  const trackUrl = `${window.location.origin}/track.html?code=${encodeURIComponent(j.id)}`;
+  const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(trackUrl)}`;
+  const now = new Date();
+  const stamp = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  return `
+    <div class="r-brand">
+      <div class="r-mark">TEHTAANKATU SUUTARI PALVELU</div>
+      <div class="r-addr">Tehtaankatu 21 lh5, 00150 Helsinki · 041 3177327</div>
+    </div>
+    <div class="r-rule"></div>
+    <div class="r-title">VASTAANOTTOKUITTI</div>
+    <div class="r-rule"></div>
+    <div class="r-kv"><span>Seurantakoodi</span><b>${j.id}</b></div>
+    <div class="r-kv"><span>Vastaanotettu</span><span>${stamp}</span></div>
+    <div class="r-block-title">ASIAKAS</div>
+    <div class="r-name">${j.name || "-"}</div>
+    <div>${j.phone || ""}</div>
+    <div class="r-block-title">TUOTE</div>
+    <div class="r-line-item"><span class="desc">${j.product || ""}<br>${j.work || ""}</span><span class="price">${j.price || 0} €</span></div>
+    <div class="r-kv" style="margin-top:8px"><span>Arvioitu valmis</span><b>${j.date || ""}</b></div>
+    ${j.customer_note ? `<div class="r-note">${j.customer_note}</div>` : ""}
+    <div class="r-rule"></div>
+    <div class="r-qr-row">
+      <img class="r-qr" src="${qrLink}" width="70" height="70">
+      <div class="r-qr-text">Seuraa tilausta:<br><code>${trackUrl.replace(/^https?:\/\//,"")}</code></div>
+    </div>
+    <div class="r-thanks"><span class="big">Kiitos, kun toit työn meille!</span>Tehtaankatu Suutari Palvelu</div>
+  `;
+}
+
+function printReceipt(id){
+  const j = jobs.find(x=>x.id===id);
+  if(!j) return;
+  document.getElementById("printReceipt").innerHTML = buildReceiptHtml(j);
+  window.print();
 }
 
 function openEditJob(id){

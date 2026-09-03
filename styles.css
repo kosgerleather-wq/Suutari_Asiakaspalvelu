@@ -897,6 +897,85 @@ main {
   color: var(--primary);
 }
 
+.row-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--primary-light);
+  display: block;
+}
+
+.row-thumb-badge {
+  position: absolute;
+  bottom: -4px;
+  left: -4px;
+  background: var(--teal);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px var(--bg-card);
+}
+
+.table-row .pill {
+  cursor: pointer;
+}
+
+.bulk-toggle-btn {
+  white-space: nowrap;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.bulk-toggle-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.bulk-bar .wide-btn {
+  width: auto;
+  padding: 8px 14px;
+}
+
+.table-card.bulk-mode .table-head,
+.table-card.bulk-mode .table-row {
+  grid-template-columns: 26px 60px 1.2fr 1.5fr 120px 100px 130px;
+}
+
+.job-row-check {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+}
+
 .table-row small {
   display: block;
   color: var(--text-muted);
@@ -2515,6 +2594,19 @@ main {
   .table-row > div:nth-child(3), .table-row > div:nth-child(4) {
     display: none;
   }
+  .table-card.bulk-mode .table-row {
+    grid-template-columns: 22px 44px 1fr 60px 90px;
+  }
+  .table-card.bulk-mode .table-row > div:nth-child(3) {
+    display: block;
+  }
+  .table-card.bulk-mode .table-row > div:nth-child(4), .table-card.bulk-mode .table-row > div:nth-child(5) {
+    display: none;
+  }
+  .bulk-bar {
+    font-size: 11px;
+    padding: 10px;
+  }
   .customer-grid {
     grid-template-columns: 1fr;
   }
@@ -2742,4 +2834,124 @@ img[src*="netlify"],
   .chat-window {
     height: 450px;
   }
+}
+
+/* Vastaanottokuitti (80mm-tulostus) — piilossa näytöllä, näkyy vain
+   tulostettaessa printReceipt():n täyttämänä. */
+#printReceipt {
+  display: none;
+}
+
+@media print {
+  body > *:not(#printReceipt) {
+    display: none !important;
+  }
+  #printReceipt {
+    display: block !important;
+    width: 80mm;
+    margin: 0 auto;
+    padding: 4mm 3mm;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #000;
+  }
+  @page {
+    margin: 4mm;
+    size: 80mm auto;
+  }
+}
+
+.r-brand {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.r-mark {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.r-addr {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.r-rule {
+  border-top: 1px dashed #666;
+  margin: 8px 0;
+}
+
+.r-title {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+}
+
+.r-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.r-block-title {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  margin: 10px 0 3px;
+  color: #333;
+}
+
+.r-name {
+  font-weight: 700;
+}
+
+.r-line-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.r-line-item .price {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.r-note {
+  margin-top: 8px;
+  font-size: 10.5px;
+  border: 1px dashed #999;
+  padding: 6px 7px;
+}
+
+.r-qr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.r-qr-text {
+  font-size: 9.5px;
+}
+
+.r-qr-text code {
+  display: block;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.r-thanks {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 10.5px;
+}
+
+.r-thanks .big {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 2px;
 }
