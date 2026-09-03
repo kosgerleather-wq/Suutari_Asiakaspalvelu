@@ -332,7 +332,7 @@ main {
 /* Stats Cards */
 .stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
   margin-bottom: 36px;
 }
@@ -2567,9 +2567,6 @@ main {
   }
   .stat strong {
     font-size: 26px;
-  }
-  .stat:nth-child(5) {
-    grid-column: 1 / -1;
   }
   .priority-grid {
     grid-template-columns: 1fr;

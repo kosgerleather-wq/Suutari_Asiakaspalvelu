@@ -146,6 +146,19 @@ function referenceDateStr(){
   return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
 }
 
+// Jobs whose delivery date has already passed but that the customer still
+// hasn't picked up (any status except "done") — regardless of whether work
+// on them is finished, waiting, or still in progress.
+function overdueUnclaimedJobs(){
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+  return jobs.filter(j => {
+    if(j.status === "done") return false;
+    const d = parseFinDate(j.date);
+    return d && d < todayStart;
+  });
+}
+
 function updateBadges(){
   const lateJobs = jobs.filter(j=>j.status==="late").length;
   const activeJobs = jobs.filter(j=>j.status==="active").length;
@@ -164,6 +177,10 @@ function updateBadges(){
   set("statInProgress", activeJobs);
   set("statReady", readyJobs);
   set("statNewMsg", whatsappWaiting);
+  const overdueJobs = overdueUnclaimedJobs();
+  const overdueSum = overdueJobs.reduce((sum, j) => sum + (Number(j.price) || 0), 0);
+  set("statOverdueCount", overdueJobs.length);
+  set("statOverdueSum", "€" + overdueSum);
   set("todayCardTitle", afterClosing ? "📦 Toimitus huomenna" : "📦 Toimitus tänään");
   set("todayCount", `${dueRefJobs.length} työtä`);
   const todayEl = document.getElementById("today");
@@ -366,6 +383,7 @@ function renderHome(){
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   renderMorningBrief();
   renderTodos();
+  renderIntakeChart();
   updateBadges();
 }
 
@@ -722,9 +740,14 @@ function goHomeStat(type) {
   chipButtons.forEach(b => b.classList.remove("active"));
   const chipIdx = chipIndexByFilter[type];
   if (chipIdx != null && chipButtons[chipIdx]) chipButtons[chipIdx].classList.add("active");
-  const note = type === "today"
+  let note = type === "today"
     ? (isAfterClosing() ? "📦 Huomenna toimitettavat työt." : "📦 Tänään toimitettavat työt.")
     : (HOME_STAT_NOTES[type] || "");
+  if (type === "overdue-unclaimed") {
+    const list = overdueUnclaimedJobs();
+    const sum = list.reduce((s,j) => s + (Number(j.price)||0), 0);
+    note = `🔴 Toimituspäivä on jo mennyt, mutta tuotetta ei ole vielä luovutettu asiakkaalle. Yhteensä ${list.length} työtä, arvo ${sum} €.`;
+  }
   setJobsFilterNote(note ? `${note} <a href="#" onclick="setJobFilter('all', document.querySelector('#jobs .chips button')); return false;" style="color:var(--teal);">Näytä kaikki</a>` : "");
   showPage("jobs");
 }
@@ -1062,6 +1085,12 @@ function renderJobs(){
   }
   if(currentJobFilter === "whatsapp-waiting"){
     a = a.filter(j => j.source === "whatsapp" && j.status === "waiting").sort(byDeliveryUrgency);
+    document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
+    return;
+  }
+  if(currentJobFilter === "overdue-unclaimed"){
+    const overdueIds = new Set(overdueUnclaimedJobs().map(j => j.id));
+    a = a.filter(j => overdueIds.has(j.id)).sort(byDeliveryUrgency);
     document.getElementById("jobsTable").innerHTML = a.length ? (tableHead + a.map(rowHtml).join("")) : empty;
     return;
   }
@@ -1676,6 +1705,76 @@ function jobCreatedDateStr(j){
   if(j.created_at) return String(j.created_at).slice(0,10);
   const d = parseFinDate(j.date);
   return d ? d.toISOString().slice(0,10) : "";
+}
+
+// SVG path for a bar with rounded top corners and a square baseline —
+// "4px rounded data-end, square at the baseline" per the mark spec.
+function roundedTopBarPath(x, y, w, h, r){
+  if(h <= 0) return "";
+  r = Math.min(r, w/2, h);
+  return `M${x},${y+h} L${x},${y+r} Q${x},${y} ${x+r},${y} L${x+w-r},${y} Q${x+w},${y} ${x+w},${y+r} L${x+w},${y+h} Z`;
+}
+
+// Motivational "how many jobs came in, day by day" chart on the home page —
+// counts jobs by intake date (jobCreatedDateStr), not delivery date.
+function buildIntakeChartData(days){
+  const out = [];
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  for(let i = days - 1; i >= 0; i--){
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const iso = localISO(d);
+    const dayJobs = jobs.filter(j => jobCreatedDateStr(j) === iso);
+    const sum = dayJobs.reduce((s,j) => s + (Number(j.price) || 0), 0);
+    out.push({ iso, date: d, count: dayJobs.length, sum });
+  }
+  return out;
+}
+
+function renderIntakeChart(){
+  const el = document.getElementById("intakeChart");
+  const totalEl = document.getElementById("intakeChartTotal");
+  if(!el) return;
+
+  const days = 14;
+  const data = buildIntakeChartData(days);
+  const totalCount = data.reduce((s,d) => s + d.count, 0);
+  const totalSum = data.reduce((s,d) => s + d.sum, 0);
+  if(totalEl) totalEl.textContent = `14 pv: ${totalCount} työtä · ${totalSum} €`;
+
+  const max = Math.max(1, ...data.map(d => d.count));
+  const W = 420, H = 132, padTop = 22, padBottom = 20;
+  const gap = 4;
+  const barW = Math.min(24, (W - gap * (data.length - 1)) / data.length);
+  const usableW = barW * data.length + gap * (data.length - 1);
+  const startX = (W - usableW) / 2;
+  const baseline = H - padBottom;
+  const todayIso = localISO(new Date());
+
+  const bars = data.map((d,i) => {
+    const x = startX + i * (barW + gap);
+    const h = d.count ? Math.max(4, (d.count / max) * (baseline - padTop)) : 0;
+    const y = baseline - h;
+    const isToday = d.iso === todayIso;
+    const fill = isToday ? "#138c8c" : "rgba(19,140,140,0.32)";
+    const countLabel = d.count ? `<text x="${x + barW/2}" y="${y - 5}" text-anchor="middle" font-size="9" font-weight="700" fill="#74828a">${d.count}</text>` : "";
+    const dayLabel = String(d.date.getDate()).padStart(2,"0");
+    const finDate = `${dayLabel}.${String(d.date.getMonth()+1).padStart(2,"0")}.${d.date.getFullYear()}`;
+    const path = roundedTopBarPath(x, y, barW, h, 4);
+    return `<g tabindex="0">
+      <title>${finDate} — ${d.count} työtä · ${d.sum} €</title>
+      <rect x="${x}" y="${padTop - 4}" width="${barW}" height="${baseline - padTop + 4}" fill="transparent"></rect>
+      ${path ? `<path d="${path}" fill="${fill}"></path>` : ""}
+      ${countLabel}
+      <text x="${x + barW/2}" y="${H - 4}" text-anchor="middle" font-size="8" fill="#9bb0bc">${dayLabel}</text>
+    </g>`;
+  }).join("");
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Vastaanotetut työt päivittäin, viimeiset ${days} päivää">
+    <line x1="${startX - 2}" y1="${baseline}" x2="${startX + usableW + 2}" y2="${baseline}" stroke="#dce6eb" stroke-width="1"></line>
+    ${bars}
+  </svg>`;
 }
 
 function getExportData(){
