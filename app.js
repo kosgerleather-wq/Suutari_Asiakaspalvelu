@@ -146,17 +146,55 @@ function referenceDateStr(){
   return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
 }
 
-// Jobs whose delivery date has already passed but that the customer still
-// hasn't picked up (any status except "done") — regardless of whether work
-// on them is finished, waiting, or still in progress.
-function overdueUnclaimedJobs(){
+function toFinDateStr(d){
+  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+}
+
+// The next calendar day after `from`, pushed to Monday if it would
+// otherwise land on a Saturday or Sunday.
+function nextBusinessDay(from){
+  const next = new Date(from);
+  next.setHours(0,0,0,0);
+  next.setDate(next.getDate() + 1);
+  const day = next.getDay(); // 0 = Sunday, 6 = Saturday
+  if(day === 6) next.setDate(next.getDate() + 2);
+  else if(day === 0) next.setDate(next.getDate() + 1);
+  return next;
+}
+
+// Every day after closing time, any job that's still unclaimed (not
+// "done") and whose delivery date has arrived or already passed gets
+// pushed to the next business day, so "Toimitus tänään" always reflects
+// a realistic expected pickup day instead of accumulating stale dates.
+// Self-limiting: once a job's date is rolled forward it's no longer due
+// today, so this won't touch it again until it becomes due once more.
+function rolloverOverdueDates(){
+  if(!isAfterClosing()) return;
   const todayStart = new Date();
   todayStart.setHours(0,0,0,0);
-  return jobs.filter(j => {
-    if(j.status === "done") return false;
+  const rolled = [];
+  jobs.forEach(j => {
+    if(j.status === "done") return;
     const d = parseFinDate(j.date);
-    return d && d < todayStart;
+    if(!d || d > todayStart) return;
+    j.date = toFinDateStr(nextBusinessDay(new Date()));
+    j.postponed_count = (j.postponed_count || 0) + 1;
+    rolled.push(j);
   });
+  if(rolled.length){
+    saveState();
+    rolled.forEach(j => dbUpdateJob(j.id, { date: j.date, postponed_count: j.postponed_count }));
+    renderHome();
+    renderJobs();
+  }
+}
+
+// Jobs that have been pushed forward by rolloverOverdueDates() at least
+// once and are still unclaimed (any status except "done") — the job's own
+// `date` keeps advancing, so postponed_count is what actually tracks "this
+// customer hasn't come to pick this up" rather than a raw date comparison.
+function overdueUnclaimedJobs(){
+  return jobs.filter(j => j.status !== "done" && (j.postponed_count || 0) > 0);
 }
 
 function updateBadges(){
@@ -746,7 +784,8 @@ function goHomeStat(type) {
   if (type === "overdue-unclaimed") {
     const list = overdueUnclaimedJobs();
     const sum = list.reduce((s,j) => s + (Number(j.price)||0), 0);
-    note = `🔴 Toimituspäivä on jo mennyt, mutta tuotetta ei ole vielä luovutettu asiakkaalle. Yhteensä ${list.length} työtä, arvo ${sum} €.`;
+    const timesTotal = list.reduce((s,j) => s + (j.postponed_count||0), 0);
+    note = `🔴 Asiakas ei ole noutanut tuotetta sovittuna päivänä — toimituspäivää on siirretty eteenpäin. Yhteensä ${list.length} työtä, arvo ${sum} €, siirretty yhteensä ${timesTotal} kertaa.`;
   }
   setJobsFilterNote(note ? `${note} <a href="#" onclick="setJobFilter('all', document.querySelector('#jobs .chips button')); return false;" style="color:var(--teal);">Näytä kaikki</a>` : "");
   showPage("jobs");
@@ -1524,6 +1563,10 @@ document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal
 let currentUser = null;
 checkAuth();
 
+// Catches the closing-time (18:00) threshold for sessions left open across
+// it, without needing a reload — see rolloverOverdueDates().
+setInterval(rolloverOverdueDates, 15 * 60 * 1000);
+
 function showLoginScreen(errorMsg) {
   document.getElementById("loginScreen").style.display = "flex";
   document.getElementById("loginInfo").style.display = "none";
@@ -1573,6 +1616,7 @@ async function checkAuth() {
     currentUser = session.user;
     hideLoginScreen();
     await initData();
+    rolloverOverdueDates();
     renderHome();
   } else {
     showLoginScreen();
@@ -1605,6 +1649,7 @@ async function login() {
   document.getElementById("loginPass").value = "";
   hideLoginScreen();
   await initData();
+  rolloverOverdueDates();
   renderHome();
 }
 
@@ -1674,6 +1719,7 @@ async function submitNewPassword() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   currentUser = session?.user || null;
   await initData();
+  rolloverOverdueDates();
   renderHome();
 }
 
